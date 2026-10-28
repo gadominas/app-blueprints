@@ -67,8 +67,10 @@ function readDocs(md) {
   // 2. Apps: script trace vs docs vs latest versions.
   const apps = [];
   for (const app of CFG.apps) {
-    const script = await get(RAW(app.repo, app.branch, app.script));
-    const docs = readDocs(await get(RAW(app.repo, app.branch, 'docs/BLUEPRINTS.md')));
+    // The full ref name: GitHub's raw cache can keep resolving a short branch name to an old commit for many minutes.
+    const ref = `refs/heads/${app.branch}`;
+    const script = await get(RAW(app.repo, ref, app.script));
+    const docs = readDocs(await get(RAW(app.repo, ref, 'docs/BLUEPRINTS.md')));
     const out = { app: app.name, repo: app.repo, version: null, rows: [], notes: [] };
     if (!script) { out.notes.push(`couldn't fetch ${app.script}`); apps.push(out); continue; }
     out.version = (/const VERSION = '([^']+)'/.exec(script) || [])[1] || '?';
