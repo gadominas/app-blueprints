@@ -13,7 +13,8 @@ const SEMVER = /^\d+\.\d+\.\d+$/;
 const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i] ? 1 : -1; return 0; };
 
 async function get(url) {
-  try { const r = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } }); return r.ok ? await r.text() : null; }
+  // GitHub's raw cache can serve a copy minutes old; a unique query string always gets the current file.
+  try { const r = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { headers: { 'Cache-Control': 'no-cache' } }); return r.ok ? await r.text() : null; }
   catch (e) { return null; }
 }
 
