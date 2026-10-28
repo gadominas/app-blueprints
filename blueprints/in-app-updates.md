@@ -1,6 +1,14 @@
-# In-app updates for Scriptable apps
+---
+id: in-app-updates
+title: In-app updates for Scriptable apps
+version: 1.0.0
+updated: 2026-10-27
+author: Gediminas Siutilas
+reference: StravaFeed 1.6.0 (https://github.com/gadominas/StravaFeed)
+depends_on: []
+---
 
-Oct 27, 2026 · @Gediminas Siutilas
+# In-app updates for Scriptable apps
 
 ## Overview
 
@@ -373,4 +381,11 @@ Add in-app updates to [Go2FGym], following the attached doc "In-app updates for 
 - Add tools/changelog.js, generate CHANGELOG.md, add docs/RELEASING.md, and an "Updates and what's new" section to the README
 - Match the sheet's colours to the app's own theme variables
 - Test with VERSION temporarily lowered, in light and dark mode, then commit and push to main (no pull request)
+- Record it in the app's trace (AGENTS.md › 4): the `BLUEPRINTS` line `{ id: 'in-app-updates', … version: '<this blueprint's version>', since: '<the app version being released>' }`, Settings › Built with, and docs/BLUEPRINTS.md
 ```
+
+## Version history
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 1.0.0 | 2026-10-27 | First versioned release |

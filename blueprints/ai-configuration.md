@@ -1,6 +1,14 @@
-# AI configuration for Scriptable apps
+---
+id: ai-configuration
+title: AI configuration for Scriptable apps
+version: 1.0.0
+updated: 2026-10-28
+author: Gediminas Siutilas
+reference: BlogPulse 1.0.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
+depends_on: [in-app-updates, settings]
+---
 
-Oct 28, 2026 · @Gediminas Siutilas
+# AI configuration for Scriptable apps
 
 ## Overview
 
@@ -499,4 +507,11 @@ Add the shared AI configuration to [Go2FGym], following the attached doc "AI con
 - Move any key the app stored before into the new Keychain name on first run, then remove the old one
 - Label all AI output with ✦ and the provider; label fallbacks "no AI"
 - Run the testing checklist in light and dark mode, bump VERSION, add a releases.json entry (highlights: choose Claude or OpenAI, pick any model, see your token usage), then commit and push to main
+- Record it in the app's trace (AGENTS.md › 4): the `BLUEPRINTS` line `{ id: 'ai-configuration', … version: '<this blueprint's version>', since: '<the app version being released>' }`, Settings › Built with, and docs/BLUEPRINTS.md
 ```
+
+## Version history
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 1.0.0 | 2026-10-28 | First versioned release |

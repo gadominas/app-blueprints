@@ -1,6 +1,14 @@
-# Settings for Scriptable apps
+---
+id: settings
+title: Settings for Scriptable apps
+version: 1.0.0
+updated: 2026-10-28
+author: Gediminas Siutilas
+reference: BlogPulse 1.1.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
+depends_on: []
+---
 
-Oct 28, 2026 · @Gediminas Siutilas
+# Settings for Scriptable apps
 
 ## Overview
 
@@ -11,8 +19,8 @@ Every app gets the same sheet, in the same order:
 - **Appearance**, identical in every app: **Colours** (palette swatches, with Auto following the system), **Layout** (Comfortable, Compact, Tiny), **Text size** (Small, Default, Large, Larger) and **Headline font** (Sans serif, Serif).
 - **The app's own choices**, one or two short sections of switches (BlogPulse: Reading).
 - **Updates**: the offer switch and **Check for updates now**.
-- **Tunables**: every number, limit and list the app runs on, grouped by area, each with its range, unit, a dot when changed and its own **Reset**.
-- A footer: "3 settings changed" and **Reset all** (two taps).
+- **Tunables**: every number, limit and list the app runs on, grouped by area, each with its range, unit, a dot when changed and its own **Reset**, then a footer: "3 settings changed" and **Reset all** (two taps).
+- **Built with**, read-only and always last: the blueprints the app was built from, each with its version and a link to read it, and a link to the blueprints repository.
 
 Changes apply the moment they are made, with no Save button: the page redraws at once and the choice is written to disk. The sheet closes with **Done**.
 
@@ -288,13 +296,15 @@ const SETTINGS_SVG = `<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 
 | Swatches | A row of 50 × 50 previews with the name under each; the selected one outlined in the accent; scrolls sideways if needed |
 | Tunable | Label with **Reset** on the right when changed, a dot after the label when changed, help line; then − field + unit, with "5–60 — original 15" under it. Text and list tunables get a full-width field instead |
 | Footer | "3 settings changed" or "All settings are at their original values", and **Reset all** (danger, two taps) |
+| Built with | Read-only rows: blueprint name, "Blueprint 1.0.0 · since BlogPulse 1.1.0", a › on the right; tapping a row opens that blueprint version; a last row opens the repository |
 
 Section order, the same in every app:
 
 1. **Appearance** (Step 3).
 2. **The app's own sections**, most used first (BlogPulse: Reading).
 3. **Updates**: offer switch, then "Check for updates now" with its result line.
-4. **Tunables**, one section per registry group, in registry order.
+4. **Tunables**, one section per registry group, in registry order, with the changed count and **Reset all** under the last one.
+5. **Built with** (Step 9), always last.
 
 ### Page code
 
@@ -479,6 +489,71 @@ Keys and tokens are not settings. Each lives in its own Keychain entry, named wi
 5. **Gestures.** Add the sheet to every "is an overlay open" check, such as pull to refresh, so dragging inside it never reloads the app.
 6. **The widget** reads the same `settings` and `cfg()` values. Where it draws colours, it uses the palette in use (Auto: light or dark by the system).
 
+## Step 9: Built with, the blueprint trace
+
+Every app records which blueprints it was built from, and which version of each, in one block in its script. The block is the app's own trace: inventory tools read it from the repository without running the script, and the Settings sheet shows it to the user as **Built with**. The rules for keeping it right are in [AGENTS.md › Blueprint versions and traces](../AGENTS.md#4-blueprint-versions-and-traces).
+
+```javascript
+// ───────── Blueprints ─────────
+// Shared blueprints this app was built with (github.com/gadominas/app-blueprints). One line per blueprint, in this exact shape:
+// inventory tools read it without running the script, and Settings › Built with shows it.
+const BLUEPRINTS_REPO = 'https://github.com/gadominas/app-blueprints';
+const BLUEPRINTS = [
+  { id: 'in-app-updates', name: 'In-app updates', version: '1.0.0', since: '1.0.0' },
+  { id: 'settings', name: 'Settings', version: '1.0.0', since: '1.1.0' },
+];
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The blueprint's `id` from its front matter, which is also its file name |
+| `name` | The name shown in Built with, as in the catalog |
+| `version` | The blueprint version the app now follows |
+| `since` | The app version that brought the app in line with that blueprint version |
+
+Add it to the state sent to the page, next to `version`:
+
+```javascript
+blueprints: BLUEPRINTS, blueprintsRepo: BLUEPRINTS_REPO, appName: APP,
+```
+
+The section, rendered after the tunables:
+
+```javascript
+const bpLink = b => `${S.blueprintsRepo}/blob/${b.id}-v${b.version}/blueprints/${b.id}.md`;   // the exact version the app follows
+function builtWithHTML() {
+  return `<h3 class="sec">Built with</h3>
+    <p class="hint">${esc(S.appName)} is built from shared blueprints that its other apps use too. Tap one to read how that part works.</p>
+    ${S.blueprints.map(b => `<button class="srow bp" data-act="openurl" data-v="${esc(bpLink(b))}">
+      <div class="grow"><b>${esc(b.name)}</b><small class="muted">Blueprint ${esc(b.version)} · since ${esc(S.appName)} ${esc(b.since)}</small></div><span class="chev" aria-hidden="true">›</span></button>`).join("")}
+    <button class="srow bp" data-act="openurl" data-v="${esc(S.blueprintsRepo)}">
+      <div class="grow"><b>All blueprints</b><small class="muted">${esc(S.blueprintsRepo.replace("https://", ""))}</small></div><span class="chev" aria-hidden="true">›</span></button>`;
+}
+// in renderCfg(), last: …${builtWithHTML()}
+// In the page's click handler:
+case "openurl": send("openurl", { v }); break;
+```
+
+Links go through the bridge, because a link followed inside the WebView would replace the app's page. The Scriptable side opens only addresses in the blueprints repository:
+
+```javascript
+case "openurl":
+  if (m.v === BLUEPRINTS_REPO || String(m.v).startsWith(BLUEPRINTS_REPO + "/")) await Safari.openInApp(m.v, false);
+  return;
+```
+
+```css
+.srow.bp{width:100%;text-align:left}
+.chev{flex:none;color:var(--muted);font-size:calc(20px * var(--ts));line-height:1}
+```
+
+Rules:
+
+- **Read-only.** Built with has no switches or fields; it only informs and links.
+- **One source.** The rows come from `BLUEPRINTS`, never from a second list in the page, so what the user sees is what inventory reads.
+- **Version-exact links.** Each row opens the blueprint at its tag (`settings-v1.0.0`), so the user reads the version the app follows, not a newer one.
+- **Every blueprint applied is listed**, including ones without settings of their own (In-app updates).
+
 ## Copy guidelines
 
 The words decide whether a user understands a setting without reading the code. Use the same patterns in every app:
@@ -494,6 +569,7 @@ The words decide whether a user understands a setting without reading the code. 
 | Units | Short and plural where needed | s, min, days, posts | seconds (sec.) |
 | Range line | Range, then the original when changed | 5–60 — original 15 | Min 5 Max 60 |
 | Reset | Per item "Reset"; all items "Reset all", then "Confirm reset" | | Restore factory defaults |
+| Built with row | Blueprint name, then "Blueprint 1.0.0 · since <App> 1.1.0" | Settings · Blueprint 1.0.0 · since BlogPulse 1.1.0 | settings.md, v1 |
 | Appearance options | Exactly: Auto + palette names; Comfortable, Compact, Tiny; Small, Default, Large, Larger; Sans serif, Serif | | Normal, Big, Huge |
 
 ## Testing checklist
@@ -517,6 +593,7 @@ The words decide whether a user understands a setting without reading the code. 
 - [ ] Running the installer or an in-app update keeps every choice.
 - [ ] The widget and Shortcuts runs use the saved values, not the defaults.
 - [ ] Dragging inside the sheet doesn't trigger pull to refresh, and re-renders keep the sheet's scroll position.
+- [ ] Built with lists every blueprint in `BLUEPRINTS` with the right versions; each row opens that blueprint version, and the last row opens the repository, in Scriptable's in-app browser.
 
 ## Pitfalls
 
@@ -543,4 +620,11 @@ Add the shared Settings sheet to [Go2FGym], following the attached doc "Settings
 - App sections: [Workout: rest timer sound, units]; tunables registry groups: [Rest timer, History, Library]
 - Settings icon left of refresh, settings.json in the app folder, only changed tunables stored, per-item Reset and Reset all
 - Run the checklist in every palette, at every text size and layout, then bump VERSION, add a releases.json entry and push to main
+- Record it in the app's trace (AGENTS.md › 4): the `BLUEPRINTS` line `{ id: 'settings', … version: '<this blueprint's version>', since: '<the app version being released>' }`, Settings › Built with, and docs/BLUEPRINTS.md
 ```
+
+## Version history
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 1.0.0 | 2026-10-28 | First versioned release |

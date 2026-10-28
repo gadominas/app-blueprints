@@ -17,11 +17,11 @@ This repository fixes that by keeping one answer per problem:
 
 ## Blueprint catalog
 
-| Blueprint | What it gives an app | Reference app | Updated |
-| --- | --- | --- | --- |
-| [In-app updates](blueprints/in-app-updates.md) | `VERSION` + `releases.json`, update check on open, “what’s new” sheet with three highlights, one-tap install, two-day snooze, generated `CHANGELOG.md` | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.6.0 | 2026-10-27 |
-| [Settings](blueprints/settings.md) | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
-| [AI configuration](blueprints/ai-configuration.md) | Claude or OpenAI with keys in the iOS Keychain, model picker from the user’s own key, connection test, one `aiCall` for every request, per-feature token usage with a 14-day chart, “✦ AI” labelling, graceful no-key mode | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.0.0 | 2026-10-28 |
+| Blueprint | Version | What it gives an app | Reference app | Updated |
+| --- | --- | --- | --- | --- |
+| [In-app updates](blueprints/in-app-updates.md) | 1.0.0 | `VERSION` + `releases.json`, update check on open, “what’s new” sheet with three highlights, one-tap install, two-day snooze, generated `CHANGELOG.md` | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.6.0 | 2026-10-27 |
+| [Settings](blueprints/settings.md) | 1.0.0 | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
+| [AI configuration](blueprints/ai-configuration.md) | 1.0.0 | Claude or OpenAI with keys in the iOS Keychain, model picker from the user’s own key, connection test, one `aiCall` for every request, per-feature token usage with a 14-day chart, “✦ AI” labelling, graceful no-key mode | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.0.0 | 2026-10-28 |
 
 Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
 
@@ -36,8 +36,11 @@ app-blueprints/
 │   ├── in-app-updates.md
 │   ├── settings.md
 │   └── ai-configuration.md
-└── templates/
-    └── blueprint-template.md ← skeleton for writing a new blueprint
+├── templates/
+│   └── blueprint-template.md ← skeleton for writing a new blueprint
+└── tools/
+    ├── inventory.js          ← which app follows which blueprint version
+    └── apps.json             ← the apps the inventory checks
 ```
 
 ## How to use it
@@ -67,6 +70,28 @@ To check an existing app, ask for a conformance review: “Check [VisionX] again
 4. Run the blueprint’s testing checklist on a phone, in light and dark mode.
 5. Release through the in-app updates flow (bump `VERSION`, add a `releases.json` entry).
 
+## Versions and traces
+
+Every blueprint carries its own version in its front matter (shown at the top of the file on GitHub) and a **Version history** at the end. Each version is tagged in this repository as `<id>-v<version>`, for example `settings-v1.0.0`, so an app can point at exactly the version it was built with.
+
+Every app leaves a trace of the blueprints it was built with, in three places that always agree:
+
+- **In the script**: a `BLUEPRINTS` block next to `VERSION`, listing each blueprint's id, name, version and the app version since which it follows it. It travels with the installed app and is the source of truth.
+- **In the app**: **Settings › Built with**, a read-only section listing the same blueprints and versions, each linking to its version of the blueprint here, plus a link to this repository, so anyone using the app can read how it was built.
+- **In the app's repository**: `docs/BLUEPRINTS.md`, the same list plus any deviations.
+
+The rules are in [AGENTS.md › 4](AGENTS.md#4-blueprint-versions-and-traces), so every rebuild or refactor by an agent keeps the trace up to date.
+
+**Inventory.** To see which app follows which blueprint version and which are behind:
+
+```bash
+node tools/inventory.js            # tables: blueprint checks, then every app
+node tools/inventory.js --strict   # exit code 1 if anything is behind, untraced or inconsistent
+node tools/inventory.js --json     # the full result for other tools
+```
+
+It reads the blueprints here and, for each app in `tools/apps.json`, the script's `BLUEPRINTS` block and `docs/BLUEPRINTS.md` straight from GitHub. Add an app to `tools/apps.json` when it adopts its first blueprint.
+
 ## Shared conventions
 
 These hold across every blueprint and every app:
@@ -85,7 +110,13 @@ These hold across every blueprint and every app:
 
 1. Build and ship the pattern in a real app first. A blueprint describes working code, not a plan.
 2. Copy [`templates/blueprint-template.md`](templates/blueprint-template.md) to `blueprints/<kebab-case-name>.md` and fill it in, keeping the reference app’s names in the code.
-3. Add a row to the catalog above **and** in [`AGENTS.md`](AGENTS.md).
-4. When a blueprint changes in a way apps must follow, update its date in both catalogs and say what changed at the top of the blueprint, so agents can bring older apps in line.
+3. Add a row to the catalog above **and** in [`AGENTS.md`](AGENTS.md), starting at version 1.0.0.
+4. To change a blueprint, bump its version (major when apps must change, minor for additions, patch for wording), add a row to its **Version history** saying what changed, update `updated` and both catalogs, commit, then tag and push the tag:
+
+   ```bash
+   git tag settings-v1.1.0 && git push origin settings-v1.1.0
+   ```
+
+5. Run `node tools/inventory.js` to see which apps are now behind.
 
 If an app finds a bug or a better way while applying a blueprint, fix the blueprint here, not only in that app.

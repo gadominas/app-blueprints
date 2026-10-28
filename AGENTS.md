@@ -6,11 +6,13 @@ Read this whole file before changing any code.
 
 ## 1. Blueprint catalog
 
-| Id | File | Raw URL | Reference implementation | Depends on |
-| --- | --- | --- | --- | --- |
-| `in-app-updates` | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
-| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
-| `ai-configuration` | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates` |
+| Id | Name | Version | File | Raw URL | Reference implementation | Depends on |
+| --- | --- | --- | --- | --- | --- | --- |
+| `in-app-updates` | In-app updates | 1.0.0 | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
+| `settings` | Settings | 1.0.0 | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
+| `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
+
+A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
 When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, and AI configuration comes last.
 
@@ -69,7 +71,7 @@ Before writing code, establish and state these values. Infer them from the targe
 You usually cannot run Scriptable. Do everything you can statically, then hand the rest to the user.
 
 - Syntax-check the script (for example `node --check` on a copy with Scriptable-only top-level `await` wrapped, or an equivalent parser).
-- Grep for the invariants in section 4.
+- Grep for the invariants in section 5.
 - Check `releases.json` is valid JSON, newest first, and its top `version` equals `VERSION` in the script.
 - Run `node tools/changelog.js` and include the regenerated `CHANGELOG.md`.
 - Copy the blueprint’s **testing checklist** into your final summary for the user to run on a phone, in light and dark mode.
@@ -78,22 +80,73 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 
 1. Bump `VERSION`, add the `releases.json` entry (three user-facing highlights), regenerate `CHANGELOG.md`.
 2. Commit the script first and `releases.json` last, so the update offer never appears before the new script exists.
-3. Record conformance in the app repository at `docs/BLUEPRINTS.md`:
+3. Leave the trace (see [Blueprint versions and traces](#4-blueprint-versions-and-traces)): update the `BLUEPRINTS` block in the script, **Built with** in Settings, and `docs/BLUEPRINTS.md`. Do this in the same commit as the code change, every time a blueprint is applied, upgraded or partly removed.
+4. Push to `main` unless the user asks for a pull request.
+
+## 4. Blueprint versions and traces
+
+Every blueprint has a version, and every app records which blueprint versions it was built with. This is what makes an inventory possible: you can tell, for any app, which capability came from which blueprint, and which apps are behind.
+
+### Blueprint versions
+
+- The version lives in the blueprint's front matter (`version: 1.0.0`) and in its **Version history** table at the end.
+- **Major** (2.0.0): apps must change to stay conformant (a renamed function, a new required step, a changed storage format).
+- **Minor** (1.1.0): something new that apps may adopt; apps on the previous minor version are still conformant.
+- **Patch** (1.0.1): wording, examples or fixes to the doc that don't change what apps do.
+- Each version is tagged in this repository as `<id>-v<version>` (for example `settings-v1.0.0`), so an app can link to, and an agent can read, exactly the version the app follows.
+- Releasing a blueprint version: update the front matter, add the Version history row, update the catalog in this file and the README, commit, then tag and push the tag.
+
+### The trace in each app
+
+An app carries its trace in three places, which must always agree:
+
+1. **The `BLUEPRINTS` block in the script**, near `VERSION`. It is the source of truth and travels with the installed app. Keep this exact one-line-per-blueprint shape, single quotes and all, because inventory reads it with a pattern, without running the script:
+
+   ```javascript
+   // ───────── Blueprints ─────────
+   // Shared blueprints this app was built with (github.com/gadominas/app-blueprints). One line per blueprint, in this exact shape:
+   // inventory tools read it without running the script, and Settings › Built with shows it.
+   const BLUEPRINTS_REPO = 'https://github.com/gadominas/app-blueprints';
+   const BLUEPRINTS = [
+     { id: 'in-app-updates', name: 'In-app updates', version: '1.0.0', since: '1.5.0' },
+     { id: 'settings', name: 'Settings', version: '1.0.0', since: '1.7.0' },
+     { id: 'ai-configuration', name: 'AI configuration', version: '1.0.0', since: '1.6.0' },
+   ];
+   ```
+
+   `version` is the blueprint version the app now follows; `since` is the app version that brought it in line with that blueprint version. List blueprints in catalog order.
+
+2. **Settings › Built with**, read-only and last in the sheet, rendered from `BLUEPRINTS`: each blueprint with its version, linking to its tagged file, and a link to this repository ([settings blueprint, Step 9](blueprints/settings.md#step-9-built-with-the-blueprint-trace)). An app without the Settings sheet yet shows the same rows wherever its version line and settings live, until it adopts the sheet.
+
+3. **`docs/BLUEPRINTS.md`** in the app repository, for people reading the repo, with the deviations:
 
    ```markdown
    # Blueprints
 
-   This app follows https://github.com/gadominas/app-blueprints.
+   This app follows the shared blueprints in https://github.com/gadominas/app-blueprints.
+   The script's `BLUEPRINTS` block is the source of truth; this table mirrors it and adds deviations.
 
-   | Blueprint | Blueprint date | Applied in version | Deviations |
+   | Blueprint | Version | Since app version | Deviations |
    | --- | --- | --- | --- |
-   | in-app-updates | 2026-10-27 | 1.1.0 | none |
-   | ai-configuration | 2026-10-28 | 1.2.0 | No background jobs, so “What AI does” is omitted |
+   | [in-app-updates](https://github.com/gadominas/app-blueprints/blob/in-app-updates-v1.0.0/blueprints/in-app-updates.md) | 1.0.0 | 1.5.0 | none |
+   | [ai-configuration](https://github.com/gadominas/app-blueprints/blob/ai-configuration-v1.0.0/blueprints/ai-configuration.md) | 1.0.0 | 1.6.0 | No background jobs, so “What AI does” has no switch |
    ```
 
-4. Push to `main` unless the user asks for a pull request.
+### When to update the trace
 
-## 4. Invariants (never break these)
+| Situation | What to do |
+| --- | --- |
+| Applying a blueprint for the first time | Add its line; `since` = the version being released |
+| Bringing an app up to a newer blueprint version | Change `version`, set `since` to the version being released |
+| Rebuilding or refactoring an app | Keep the block; check each listed blueprint is still followed, and fix the code or the trace (with a deviation) before releasing |
+| An app that predates traces (no `BLUEPRINTS` block) | Add the block on its next release: list what its `docs/BLUEPRINTS.md` and the code show, at version `1.0.0` if the code matches that version, otherwise note the gap as a deviation |
+| Removing a capability that came from a blueprint | Remove its line and its Built with row, and say so in the release notes |
+
+### Inventory and validation
+
+`node tools/inventory.js` (run from this repository) reads every blueprint's front matter and every app listed in `tools/apps.json`, fetches each app's script and `docs/BLUEPRINTS.md` from GitHub, and reports per app and blueprint: the version followed, the latest version, and whether it is current, behind, missing a trace, or inconsistent between the script and the docs. It also checks that every blueprint version has its tag. Add new apps to `tools/apps.json`.
+
+## 5. Invariants (never break these)
 
 **Security and privacy**
 - API keys are entered in a native `Alert` secure field, stored only in the Keychain under app-prefixed names, and sent only to their own provider. They never appear in settings JSON, the page, logs, bridge URLs or the repository. The page sees masked keys only.
@@ -107,7 +160,11 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 - Tunables are declared in the `CONFIG` registry, read only through `cfg()`, validated and clamped by `setCfg`, and stored only when they differ from the default; keys are never renamed.
 - The `set` action only accepts keys on its allow-list.
 - Secrets are never settings: each has its own Keychain entry, is typed into a native secure prompt, and the page sees only its last four characters.
-- Section order: Appearance, the app’s own sections, Updates, tunables; the settings icon is an SVG line icon left of refresh.
+- Section order: Appearance, the app’s own sections, Updates, tunables, Built with; the settings icon is an SVG line icon left of refresh.
+
+**Traces**
+- Every app has a `BLUEPRINTS` block in the exact shape above, listing every blueprint it follows with the version it follows; Built with and `docs/BLUEPRINTS.md` say the same.
+- The trace is updated in the same commit as the code it describes; never claim a blueprint version the code doesn't follow.
 
 **Behaviour**
 - Versions are compared numerically with `cmpVer`, never as strings.
@@ -128,26 +185,27 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 - AI output is labelled `✦ AI … by <Provider>`.
 - User-facing copy (buttons, toasts, labels) matches the blueprint wording.
 
-## 5. When the blueprint doesn’t fit
+## 6. When the blueprint doesn’t fit
 
 - If the app genuinely can’t follow a step, choose the smallest deviation, implement it, and list it under **Deviations** in `docs/BLUEPRINTS.md` with the reason.
 - Never silently “improve” a blueprint inside one app. If you find a bug or a clearly better approach, implement the blueprint as written (or the minimal fix if it is broken), then tell the user and propose the change to this repository, so every app benefits.
 - If a blueprint is ambiguous, prefer what the reference implementation does.
 
-## 6. Conformance review (when asked to check an app)
+## 7. Conformance review (when asked to check an app)
 
-Do not change code. For each applicable blueprint, report:
+Do not change code. Start from `node tools/inventory.js` to see what each app claims; then read the code to check the claim. For each applicable blueprint, report:
 
 1. **Missing**: steps or features not present.
 2. **Divergent**: present but with different names, order, wording, storage or behaviour.
-3. **Invariant violations** from section 4, highest risk first (security issues on top).
+3. **Invariant violations** from section 5, highest risk first (security issues on top).
 4. **Suggested plan**: the smallest set of changes to conform, and the version to release them in.
 
-## 7. Final summary to the user
+## 8. Final summary to the user
 
 End every blueprint task with:
 
 - the per-app parameters you used,
+- the app's `BLUEPRINTS` block after your change (blueprint versions and `since`),
 - what changed, file by file,
 - deviations and why,
 - the blueprint testing checklist to run on the phone,

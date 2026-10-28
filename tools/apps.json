@@ -1,0 +1,11 @@
+{
+  "blueprintsRepo": "gadominas/app-blueprints",
+  "apps": [
+    { "name": "BlogPulse", "repo": "gadominas/BlogPulse", "branch": "main", "script": "BlogPulse.js" },
+    { "name": "Strava Daily Digest", "repo": "gadominas/StravaFeed", "branch": "main", "script": "Strava Daily Digest.js" },
+    { "name": "Dienynas+ (Tamo+)", "repo": "gadominas/Tamo-", "branch": "master", "script": "Dienynas.js" },
+    { "name": "Go2FGym", "repo": "gadominas/Go2FGym", "branch": "main", "script": "Go2FGym.js" },
+    { "name": "VisionX", "repo": "gadominas/VisionX", "branch": "main", "script": "VisionX.js" },
+    { "name": "Reading Stars", "repo": "gadominas/Reading-Stars", "branch": "main", "script": "Reading Stars.js" }
+  ]
+}

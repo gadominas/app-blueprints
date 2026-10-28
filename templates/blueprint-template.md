@@ -1,6 +1,14 @@
-# <Capability> for Scriptable apps
+---
+id: <kebab-case-id, same as the file name>
+title: <Capability> for Scriptable apps
+version: 1.0.0
+updated: <YYYY-MM-DD>
+author: Gediminas Siutilas
+reference: <App> <version> (https://github.com/gadominas/<App>/blob/main/<App>.js)
+depends_on: []
+---
 
-<Date> · @Gediminas Siutilas
+# <Capability> for Scriptable apps
 
 ## Overview
 
@@ -52,4 +60,11 @@ Add <capability> to [App], following the attached doc "<title>" exactly, with <A
 - Repository: github.com/gadominas/[App], branch main, script file [App.js]
 - <per-app values>
 - Run the testing checklist in light and dark mode, bump VERSION, add a releases.json entry, then commit and push to main
+- Record it in the app's trace (AGENTS.md › 4): the `BLUEPRINTS` line, Settings › Built with, and docs/BLUEPRINTS.md
 ```
+
+## Version history
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 1.0.0 | <YYYY-MM-DD> | First versioned release |
