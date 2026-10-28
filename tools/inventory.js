@@ -40,7 +40,7 @@ function readDocs(md) {
   const rows = {};
   for (const l of md.split('\n')) {
     const m = /^\|\s*\[?([a-z0-9-]+)\]?(?:\([^)]*\))?\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/.exec(l);
-    if (m && m[1] !== 'blueprint') rows[m[1]] = { version: m[2], since: m[3] };
+    if (m && m[1] !== 'blueprint' && !/^-+$/.test(m[1])) rows[m[1]] = { version: m[2], since: m[3] };
   }
   return rows;
 }
