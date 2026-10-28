@@ -8,10 +8,13 @@ Read this whole file before changing any code.
 
 | Id | File | Raw URL | Reference implementation | Depends on |
 | --- | --- | --- | --- | --- |
+| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/StravaFeed (v1.8.1) | — |
 | `in-app-updates` | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
 | `ai-configuration` | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates` |
 
-When asked to “apply all blueprints”, apply them in the order of this table.
+When asked to “apply all blueprints”, apply them in this order: `in-app-updates`, `settings`, `ai-configuration`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, and AI configuration comes last.
+
+**Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
 
 ## 2. What these blueprints target
 
@@ -39,6 +42,8 @@ Before writing code, establish and state these values. Infer them from the targe
 | Current and next `VERSION` | `1.0.0` → `1.1.0` | all |
 | Theme colour variables | the app’s equivalents of `--card`, `--soft`, `--mut`, `--accent`, `--rule`, `--ink`, `--danger` | all UI |
 | Bridge helpers | names of the app’s `send`, `push`/state function, `toast`, `js`, settings save | all |
+| Keychain settings key | `go2fgym-settings` | settings |
+| Settings mapping table | every hardcoded value → sheet, `CONFIG` only, or code constant | settings (show it to the user and wait for confirmation before writing code) |
 | AI feature tags and labels | `suggestions: "Comment ideas"` | AI configuration |
 | Background AI jobs | `summaries` on refresh, or none | AI configuration |
 | Existing code to replace | old AI calls, old key storage, old version checks | all |
@@ -93,6 +98,13 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 - API keys are entered in a native `Alert` secure field, stored only in the Keychain under app-prefixed names, and sent only to their own provider. They never appear in settings JSON, the page, logs, bridge URLs or the repository. The page sees masked keys only.
 - Text from the network or from AI is escaped before it is inserted into the page.
 - Never commit tokens, keys or personal data, including in examples and test fixtures.
+
+**Settings**
+- Saved settings are applied at the entry point, before the app, widget and Shortcuts branches.
+- Nothing is saved until **Save**; Save validates on the Scriptable side and stores everything or nothing.
+- An empty secret field keeps the saved secret; only an explicit Remove deletes it.
+- Inline controls and the sheet read and write the same Keychain key for a value.
+- The gear is an inline SVG line icon, the same size as its neighbours; section order is main feature, content, updates, advanced.
 
 **Behaviour**
 - Versions are compared numerically with `cmpVer`, never as strings.
