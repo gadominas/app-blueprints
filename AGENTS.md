@@ -8,7 +8,7 @@ Read this whole file before changing any code.
 
 | Id | File | Raw URL | Reference implementation | Depends on |
 | --- | --- | --- | --- | --- |
-| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/StravaFeed (v1.8.1) | — |
+| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
 | `in-app-updates` | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
 | `ai-configuration` | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates` |
 
@@ -42,8 +42,9 @@ Before writing code, establish and state these values. Infer them from the targe
 | Current and next `VERSION` | `1.0.0` → `1.1.0` | all |
 | Theme colour variables | the app’s equivalents of `--card`, `--soft`, `--mut`, `--accent`, `--rule`, `--ink`, `--danger` | all UI |
 | Bridge helpers | names of the app’s `send`, `push`/state function, `toast`, `js`, settings save | all |
-| Keychain settings key | `go2fgym-settings` | settings |
-| Settings mapping table | every hardcoded value → sheet, `CONFIG` only, or code constant | settings (show it to the user and wait for confirmation before writing code) |
+| App folder | `Go2FGym` (holds `settings.json`) | settings |
+| Colour token mapping | the app’s current variables → `--paper`, `--sheet`, `--ink`, `--ink-2`, `--muted`, `--rule`, `--signal`, `--signal-wash`, `--amber`, `--amber-wash`, `--danger` | settings |
+| Settings mapping table | every hardcoded value → Appearance, app section, remembered pick, tunable, internal state or code constant | settings (show it to the user and wait for confirmation before writing code) |
 | AI feature tags and labels | `suggestions: "Comment ideas"` | AI configuration |
 | Background AI jobs | `summaries` on refresh, or none | AI configuration |
 | Existing code to replace | old AI calls, old key storage, old version checks | all |
@@ -100,11 +101,13 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 - Never commit tokens, keys or personal data, including in examples and test fixtures.
 
 **Settings**
-- Saved settings are applied at the entry point, before the app, widget and Shortcuts branches.
-- Nothing is saved until **Save**; Save validates on the Scriptable side and stores everything or nothing.
-- An empty secret field keeps the saved secret; only an explicit Remove deletes it.
-- Inline controls and the sheet read and write the same Keychain key for a value.
-- The gear is an inline SVG line icon, the same size as its neighbours; section order is main feature, content, updates, advanced.
+- Settings are loaded before the app, widget and Shortcuts branches, and saved after every change (no Save button).
+- Every app has the same Appearance section: Auto plus six palettes, Comfortable/Compact/Tiny, Small/Default/Large/Larger, Sans serif/Serif, with these exact labels.
+- Every colour is a shared token and every font size is `calc(<px> * var(--ts))`; form fields stay at 16px.
+- Tunables are declared in the `CONFIG` registry, read only through `cfg()`, validated and clamped by `setCfg`, and stored only when they differ from the default; keys are never renamed.
+- The `set` action only accepts keys on its allow-list.
+- Secrets are never settings: each has its own Keychain entry, is typed into a native secure prompt, and the page sees only its last four characters.
+- Section order: Appearance, the app’s own sections, Updates, tunables; the settings icon is an SVG line icon left of refresh.
 
 **Behaviour**
 - Versions are compared numerically with `cmpVer`, never as strings.

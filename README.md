@@ -19,7 +19,7 @@ This repository fixes that by keeping one answer per problem:
 
 | Blueprint | What it gives an app | Reference app | Updated |
 | --- | --- | --- | --- |
-| [Settings](blueprints/settings.md) | Hardcoded values moved into a Settings sheet behind a gear icon: defaults in `CONFIG`, choices saved in the Keychain and layered on top at start (so updates never reset them), a schema-driven sheet with fixed anatomy, section order, effect classes after Save, and copy guidelines | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.8.1 | 2026-10-28 |
+| [Settings](blueprints/settings.md) | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
 | [In-app updates](blueprints/in-app-updates.md) | `VERSION` + `releases.json`, update check on open, “what’s new” sheet with three highlights, one-tap install, two-day snooze, generated `CHANGELOG.md` | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.6.0 | 2026-10-27 |
 | [AI configuration](blueprints/ai-configuration.md) | Claude or OpenAI with keys in the iOS Keychain, model picker from the user’s own key, connection test, one `aiCall` for every request, per-feature token usage with a 14-day chart, “✦ AI” labelling, graceful no-key mode | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.0.0 | 2026-10-28 |
 
@@ -72,11 +72,12 @@ To check an existing app, ask for a conformance review: “Check [VisionX] again
 These hold across every blueprint and every app:
 
 - **One script per app**, with constants at the top and the start-up call at the very end.
-- **Users never edit code.** Anything a user would reasonably want different is a setting in the gear sheet; `CONFIG` holds only the defaults, and saved choices are applied at the entry point so widgets and Shortcuts runs use them too.
+- **Users never edit code.** Anything a user would reasonably want different is a setting in the Settings sheet; the code holds only defaults, and saved choices are loaded before the app, widget and Shortcuts branches.
+- **One look system.** Every colour comes from the shared tokens (`--paper`, `--sheet`, `--ink`, `--signal`, …) and every font size scales with `--ts`, so the common Appearance settings work in every app.
 - **Secrets live in the iOS Keychain only**, under names prefixed with the app id. Never in settings JSON, the page or the repository.
 - **The page never calls external APIs.** It sends actions over the app’s `myapp://` bridge; the Scriptable side does the work and pushes state back.
 - **Remote or AI-written text is escaped** before it reaches the page.
-- **CSS uses the app’s own theme variables**, so shared sheets follow each app’s light and dark themes. Shared class names are prefixed (`upd…`, `ai…`).
+- **Shared sheets use the shared colour tokens**, so they follow every palette in light and dark mode. Shared class names are prefixed (`upd…`, `ai…`).
 - **Destructive actions take two taps** (button turns into **Confirm** for ~3.5 s).
 - **Every release** bumps `VERSION`, adds a `releases.json` entry with three user-facing highlights and regenerates `CHANGELOG.md`.
 

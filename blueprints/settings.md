@@ -1,336 +1,483 @@
-# Settings blueprint for Scriptable apps
+# Settings for Scriptable apps
 
 Oct 28, 2026 · @Gediminas Siutilas
 
 ## Overview
 
-Every value a user might reasonably want different moves out of the code and into a Settings sheet behind a gear icon in the header; the code keeps only the defaults. Users' choices are saved in the iOS Keychain, layered over those defaults at start, so an update never resets them and nobody edits code again.
+Every value a user might reasonably want different moves out of the code and into one Settings sheet. The code keeps only the defaults; the user's choices are saved next to the app's data and layered over those defaults, so an update never resets them and nobody edits code again.
 
-The reference is StravaFeed v1.8.1 ([Strava Daily Digest.js](https://github.com/gadominas/StravaFeed/blob/main/Strava%20Daily%20Digest.js)): search it for `settingsForPage`, `openSettings` and `settings-save` to see each piece below working together. The blueprint covers what to extract, how to store and apply it, and exactly how the Settings sheet looks and behaves, so every app ends up with the same pattern and the same feel.
+Every app gets the same sheet, in the same order:
 
-> **How this fits with the other blueprints**
->
-> - **AI keys, provider, model and effort follow [AI configuration](ai-configuration.md), not this blueprint.** In an app with AI, the main feature's section starts with one **AI settings** row (status line plus button) that opens the AI sheet; there is no API key field, model field or thinking-effort select in this sheet, and AI keys are only ever typed into a native secure alert. The `secret`, `aiModel` and `aiReasoning` examples below show the StravaFeed 1.8.1 starting point, before AI configuration was applied (StravaFeed 1.9.1 shows the result).
-> - **Taste choices around AI stay here**: language, tone, default mood and custom prompt are ordinary settings or remembered picks (Step 6).
-> - **[In-app updates](in-app-updates.md)** supplies the Updates section: the offer switch, version and **Check now** (Step 8).
+- **Appearance**, identical in every app: **Colours** (palette swatches, with Auto following the system), **Layout** (Comfortable, Compact, Tiny), **Text size** (Small, Default, Large, Larger) and **Headline font** (Sans serif, Serif).
+- **The app's own choices**, one or two short sections of switches (BlogPulse: Reading).
+- **Updates**: the offer switch and **Check for updates now**.
+- **Tunables**: every number, limit and list the app runs on, grouped by area, each with its range, unit, a dot when changed and its own **Reset**.
+- A footer: "3 settings changed" and **Reset all** (two taps).
+
+Changes apply the moment they are made, with no Save button: the page redraws at once and the choice is written to disk. The sheet closes with **Done**.
+
+Reference implementation: [BlogPulse.js](https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js) 1.1.0. The code below is taken from it, with names kept, so the two can be compared line by line. Other blueprints add their own rows to this sheet in the sections they name; their details live in those blueprints.
 
 ## Step 1: audit the hardcoded values
 
-List every literal in the script that changes behaviour, then sort each into one of three places. A value becomes a setting when a reasonable user would want it different and could judge the choice themselves.
+List every literal in the script that changes behaviour or looks, then sort each into one place. A value becomes a setting when a reasonable user would want it different and could judge the choice themselves.
 
 | Put it in | When the value is… | Examples |
 | --- | --- | --- |
-| **Settings sheet** | Personal: an account, key or ID | API keys, athlete or account IDs |
-| **Settings sheet** | A matter of taste | Language, tone, default mode, custom prompt |
-| **Settings sheet** | A trade-off the user feels | Load extra details (slower start), AI model and effort (cost, speed) |
-| **Settings sheet** | Privacy or visibility | Show my own items, names on widgets |
-| **Settings sheet** | Behaviour the user may find annoying | Update offers, reminders, sounds |
-| **`CONFIG` only** (defaults, not in the sheet) | Useful to tinker with, but meaningless to most users | Concurrency, page limits, debug dumps |
-| **Code constant** | Fixed by how the app works | URLs, endpoints, version, Keychain key names, timeouts |
+| **Appearance** | How the app looks. Always these four, in every app | Colours, layout density, text size, headline font |
+| **App section** (switch or segmented control) | A behaviour people form an opinion about | Mark as read when opened, show my own items |
+| **Remembered pick** (inline control, also saved) | A choice made mid-task, right where it's used | Group by day or week, current tab or filter |
+| **Tunables** (registry with range and Reset) | A number, limit or list people may tune, with a safe range | Time limit per request, items kept, refresh interval, quick-reply presets |
+| **Updates** | Update behaviour (from the in-app updates blueprint) | Offer new versions |
+| **Internal state** (same file, never shown) | Something the app records for itself | Last visit, last check |
+| **Code constant** | Fixed by how the app works | URLs, endpoints, `VERSION`, file and Keychain names |
 
-StravaFeed as the worked example, every former hardcoded value and where it ended up:
+BlogPulse as the worked example:
 
-| Former value | Now | Control in the sheet | Section |
+| Former value | Now | Control | Section |
 | --- | --- | --- | --- |
-| OpenAI API key (pasted on first use) | Secret, own Keychain key | Password field + Remove saved key | AI comments |
-| `AI.MODEL` | Setting | Text field | AI comments |
-| `AI.REASONING` | Setting | Select: Low, Medium, High | AI comments |
-| AI language (EN, LT) | Remembered pick, own Keychain key | Select | AI comments |
-| AI mood | Remembered pick, own Keychain key | Select | AI comments |
-| Custom prompt | Remembered pick, own Keychain key | Text area, 200 characters | AI comments |
-| `INCLUDE_ME` | Setting | Switch | Digest |
-| `ENRICH_DETAILS` | Setting | Switch with helper text | Digest |
-| `WIDGET_NAMES` | Setting | Switch | Digest |
-| `CHECK_UPDATES` | Setting | Switch, plus Check now button | Updates |
-| `ATHLETE_ID` | Setting | Numeric text field, empty means detect | Advanced |
-| `DAYS_IN_PICKER`, `MAX_PAGES`, `ENRICH_CONCURRENCY`, `DEBUG_DUMP` | `CONFIG` only | None |  |
-| Repository URL, `VERSION`, Keychain key names | Code constants | None |  |
+| Colours, density, text size, font | `settings.theme`, `density`, `textSize`, `font` | Swatches, segmented controls | Appearance |
+| `readOnOpen` | `settings.readOnOpen` | Switch | Reading |
+| `checkUpdates` | `settings.checkUpdates` | Switch, plus **Check** | Updates |
+| `groupBy`, `view` | Remembered picks in `settings` | Inline controls on the main screen | Not in the sheet |
+| Fetch time limit, blogs checked at once, browser identity | `CONFIG` registry, sparse overrides in `settings.cfg` | Stepper, text field | Checking blogs |
+| Keep posts for, keep at most, new blog backlog, posts per page | `CONFIG` registry | Stepper | Keeping posts |
+| Widget refresh and check budget | `CONFIG` registry | Stepper | Widget |
+| Quick instructions for invites | `CONFIG` registry | One per line | Invites |
+| `lastSession`, `lastScan` | Internal state in `settings` | None | |
+| `APP`, `VERSION`, catalog URLs | Code constants | None | |
 
-The last two rows matter as much as the rest: a sheet with every knob in it is as unusable as code editing. Aim for one screen of settings per section.
+Aim for one screen per section. A sheet with every knob in it is as unusable as editing code, which is why tunables carry a range, a unit and a one-line explanation.
 
-## Step 2: the layered model
+## Step 2: where settings live
 
-The app always runs on defaults from the code with the user's saved choices layered on top; secrets and remembered picks live beside them in their own Keychain keys.
+One JSON file, `settings.json`, in the app's own folder in Scriptable's documents (iCloud Drive when available, so choices follow the user to another device). It holds three kinds of value side by side:
 
 ```mermaid
 flowchart LR
-  D["Defaults<br/>CONFIG block in code"] --> E{{"Effective values<br/>(readSettings + applySettings)"}}
-  S["Saved settings<br/>myapp-settings, one JSON"] --> E
-  K["Secrets<br/>one Keychain key each"] --> R
-  P["Remembered picks<br/>one Keychain key each"] --> E
-  E --> A["App"]
-  E --> W["Widget"]
-  E --> X["Shortcuts runs"]
-  R["The feature that needs the secret"]
-  SH["Settings sheet"] -. reads and writes .-> S
-  SH -. last 4 characters only .-> K
-  SH -. reads and writes .-> P
+  D["Defaults<br/>in code"] --> M{{"settings object<br/>defaults + saved file"}}
+  F["settings.json<br/>app folder"] --> M
+  R["CONFIG registry<br/>def, min, max, step"] --> C{{"cfg(k)<br/>override or default"}}
+  F -- "settings.cfg<br/>only changed tunables" --> C
+  M --> A["App, widget,<br/>Shortcuts runs"]
+  C --> A
+  K["Keychain<br/>secrets only"] -. never in the file .-> A
 ```
 
-Only the effective values reach the app, widget and Shortcuts runs. The sheet reads and writes the three stores, but sees just the last four characters of a secret.
+| Store | Holds | Written by |
+| --- | --- | --- |
+| Defaults in code | Every choice's starting value | You, in code |
+| `settings` (in `settings.json`) | Appearance, app choices, remembered picks, internal state | The sheet and inline controls, at once |
+| `settings.cfg` (inside the same file) | Only the tunables the user changed | The sheet's tunable fields; deleted again on Reset |
+| Keychain | Keys and tokens, one entry each, never in the file | A native secure prompt (Step 7) |
 
-| Store | Holds | Keychain key | Written by |
-| --- | --- | --- | --- |
-| Defaults | Every setting's starting value | None (the `CONFIG` block) | You, in code |
-| Saved settings | Everything the user changed in the sheet | `myapp-settings`, one JSON object | Save |
-| Secrets | API keys and tokens | One key each, e.g. `myapp-openai-key` | Save, only when a new value was typed; Remove saved key |
-| Remembered picks | Choices also made inline, mid-task | One key each, e.g. `myapp-ai-mode` | Inline controls and Save |
-
-Because updates replace only the script file, everything in the Keychain survives every update.
-
-## Step 3: storage and apply code
-
-Five small functions on the Scriptable side do all of it. Put them together in one section of the script, after the constants.
+Updates replace only the script, so everything in the file and the Keychain survives every update.
 
 ```javascript
-const KC_SETTINGS = 'myapp-settings';          // one Keychain key per app
-const DEFAULTS = {                              // snapshot of CONFIG before anything is applied
-  includeMe: CONFIG.INCLUDE_ME, enrich: CONFIG.ENRICH_DETAILS,
-  checkUpdates: CONFIG.CHECK_UPDATES, aiModel: CONFIG.AI.MODEL, aiReasoning: CONFIG.AI.REASONING,
-  accountId: CONFIG.ACCOUNT_ID ? String(CONFIG.ACCOUNT_ID) : '',
+// ---------- storage ----------
+const fm = (() => { try { return FileManager.iCloud(); } catch (e) { return FileManager.local(); } })();
+const DIR = fm.joinPath(fm.documentsDirectory(), APP);
+if (!fm.fileExists(DIR)) fm.createDirectory(DIR, true);
+const P = n => fm.joinPath(DIR, n + ".json");
+async function load(n, def) {
+  const p = P(n);
+  if (!fm.fileExists(p)) return def;
+  try {
+    if (fm.isFileStoredIniCloud(p) && !fm.isFileDownloaded(p)) await fm.downloadFileFromiCloud(p);
+    return JSON.parse(fm.readString(p));
+  } catch (e) { return def; }   // a broken file falls back to defaults, never crashes
+}
+const write = (n, v) => fm.writeString(P(n), JSON.stringify(v));
+
+// Defaults first, saved choices on top.
+const settings = Object.assign(
+  { groupBy: "day", view: "unread", readOnOpen: false, lastSession: 0, lastScan: 0,
+    checkUpdates: true,   // offer new versions from GitHub (asks again 2 days after "Later")
+    theme: "auto", density: "comfortable", font: "sans", textSize: 1 },
+  await load("settings", {})
+);
+```
+
+Rules:
+
+- **Load before anything runs**, including the widget and Shortcuts branches, so they use the user's choices, not the defaults.
+- **Save after every change.** iOS can end a Scriptable script at any moment; nothing waits for the sheet to close.
+- **One file per app**, named by the app's folder. Keys and tokens never go in it: it's plain JSON in iCloud Drive.
+
+## Step 3: Appearance, the common part
+
+These four settings and their controls are the same in every app, so the apps feel like one family. Each app keeps its own palette colours; the names, controls, options and order never change.
+
+### Colour tokens
+
+Every colour in the app's CSS comes from these tokens, and nothing else. An app adopting this blueprint renames its colour variables to them (or aliases them).
+
+| Token | Use |
+| --- | --- |
+| `--paper` | Page background |
+| `--sheet` | Cards, rows, controls |
+| `--ink`, `--ink-2` | Text, secondary text |
+| `--muted` | Hints, captions |
+| `--rule` | Borders and dividers |
+| `--signal`, `--signal-wash` | The accent and a pale fill behind it |
+| `--amber`, `--amber-wash` | Warnings and highlights |
+| `--danger` | Destructive actions and errors |
+
+### Palettes
+
+Six palettes plus **Auto**, which follows the system: the first light palette in light mode, `night` in dark mode, and it switches live when the system does. `contrast` is there for readability; keep it in every app.
+
+```javascript
+const PALETTES = {
+  ink:      { paper: "#f6f7f9", sheet: "#ffffff", ink: "#0f172a", ink2: "#334155", muted: "#5b6475", rule: "#dde2ea", signal: "#1d4ed8", signalWash: "#e5edff", amber: "#b45309", amberWash: "#fdf0dc", danger: "#b91c1c", scheme: "light" },
+  sepia:    { paper: "#f3ead6", sheet: "#fbf5e6", ink: "#2a1f14", ink2: "#4b3b2a", muted: "#73604a", rule: "#e1d3b5", signal: "#8a3b12", signalWash: "#f3dfc8", amber: "#a16207", amberWash: "#f6e5bf", danger: "#9f1239", scheme: "light" },
+  mint:     { paper: "#f1f6f3", sheet: "#ffffff", ink: "#0d2318", ink2: "#2c4a3b", muted: "#556d60", rule: "#d3e2d9", signal: "#15803d", signalWash: "#dcf3e4", amber: "#b45309", amberWash: "#fbeed8", danger: "#b91c1c", scheme: "light" },
+  contrast: { paper: "#ffffff", sheet: "#ffffff", ink: "#000000", ink2: "#111111", muted: "#333333", rule: "#9a9a9a", signal: "#0033cc", signalWash: "#e0e8ff", amber: "#7a4b00", amberWash: "#ffeec2", danger: "#a30000", scheme: "light" },
+  slate:    { paper: "#1c2128", sheet: "#22272e", ink: "#e6edf3", ink2: "#c5ced8", muted: "#9aa5b1", rule: "#373e47", signal: "#6cb6ff", signalWash: "#1d3350", amber: "#e3b341", amberWash: "#3a2f12", danger: "#ff8a7a", scheme: "dark" },
+  night:    { paper: "#05070b", sheet: "#0f141c", ink: "#f3f6fa", ink2: "#d0d7e1", muted: "#9aa4b2", rule: "#1f2733", signal: "#7ab4ff", signalWash: "#132640", amber: "#f5c04a", amberWash: "#2d240c", danger: "#ff8f7a", scheme: "dark" },
 };
-const REASONING_LEVELS = ['low', 'medium', 'high'];
+const PALETTE_CSS = Object.entries(PALETTES).map(([k, p]) => `[data-theme=${k}]{--paper:${p.paper};--sheet:${p.sheet};--ink:${p.ink};--ink-2:${p.ink2};--muted:${p.muted};--rule:${p.rule};--signal:${p.signal};--signal-wash:${p.signalWash};--amber:${p.amber};--amber-wash:${p.amberWash};--danger:${p.danger};color-scheme:${p.scheme}}`).join("\n");
+```
 
-// 1. Read: defaults first, saved values on top. A broken entry falls back to defaults, never crashes.
-function readSettings() {
-  try { return Object.assign({}, DEFAULTS, Keychain.contains(KC_SETTINGS) ? JSON.parse(Keychain.get(KC_SETTINGS)) : {}); }
-  catch (e) { return Object.assign({}, DEFAULTS); }
+An app may change the palette colours to suit its brand (StravaFeed's accent is Strava orange), but keeps the six palette names, `scheme` for each, and readable contrast in all of them.
+
+### Layout, text size and font
+
+Three more tokens carry the rest of the look. Every font size in the app is written as `calc(<px> * var(--ts))`, and every card spacing uses the density tokens, so one setting changes the whole page.
+
+| Setting | Options (value) | Applied as |
+| --- | --- | --- |
+| Layout | Comfortable (`comfortable`), Compact (`compact`), Tiny (`tiny`) | `body.d-<value>` overrides `--t`, `--d`, `--m`, `--pad` (title, body, meta sizes and card padding). Tiny may also switch lists to one-line rows |
+| Text size | Small (`0.92`), Default (`1`), Large (`1.12`), Larger (`1.25`) | `--ts` on the root element, a multiplier inside every font size |
+| Headline font | Sans serif (`sans`), Serif (`serif`) | `html[data-font]` swaps `--display`, the font of titles and headings |
+| Colours | Auto, then the six palettes | `html[data-theme]` selects a palette's tokens |
+
+```css
+:root{
+  --ts:1; --serif: ui-serif, "New York", Georgia, serif; --sans: -apple-system, system-ui, "SF Pro Text", sans-serif; --display: var(--sans);
+  --t:19px; --d:16px; --m:13.5px; --pad:16px;
+}
+html[data-font=serif]{--display:var(--serif)}
+${PALETTE_CSS}
+body.d-compact{--t:16.5px;--d:14.5px;--m:12.5px;--pad:11px}
+body.d-tiny{--t:15.5px;--m:12px;--pad:9px}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:calc(16px * var(--ts));line-height:1.5;-webkit-text-size-adjust:100%}
+```
+
+### Applying the look in the page
+
+The page applies the look itself, at start and on every change, so a tap redraws instantly without waiting for the Scriptable side.
+
+```javascript
+const look = { theme: S.settings.theme || "auto", density: S.settings.density || "comfortable", font: S.settings.font || "sans", textSize: +S.settings.textSize || 1 };
+const THEMES = [["auto", "Auto"]].concat(Object.keys(S.palettes).map(k => [k, k[0].toUpperCase() + k.slice(1)]));
+const dark = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : { matches: false };
+function applyLook() {
+  const root = document.documentElement;
+  root.dataset.theme = look.theme === "auto" ? (dark.matches ? "night" : "ink") : look.theme;
+  root.dataset.font = look.font;
+  root.style.setProperty("--ts", look.textSize);
+  document.body.classList.remove("d-comfortable", "d-compact", "d-tiny");
+  document.body.classList.add("d-" + look.density);
+}
+const onDark = () => { if (look.theme === "auto") applyLook(); };
+if (dark.addEventListener) dark.addEventListener("change", onDark); else if (dark.addListener) dark.addListener(onDark);
+
+const segRow = (k, opts) => `<div class="seg wide">${opts.map(([v, l]) => `<button class="${String(look[k]) === String(v) ? "on" : ""}" data-act="look" data-k="${k}" data-v="${v}">${l}</button>`).join("")}</div>`;
+function lookHTML() {
+  return `
+    <div class="lk-row"><span class="lk-l">Colours</span><div class="sws">${THEMES.map(t => `
+      <button class="sw ${look.theme === t[0] ? "on" : ""}" data-act="look" data-k="theme" data-v="${t[0]}" aria-label="${t[1]} colours">
+        <span class="prev" style="${t[0] === "auto" ? `background:linear-gradient(135deg,${S.palettes.ink.paper} 50%,${S.palettes.night.sheet} 50%);color:${S.palettes.night.signal}` : `background:${S.palettes[t[0]].paper};color:${S.palettes[t[0]].ink}`}">Aa<i style="background:${(S.palettes[t[0]] || S.palettes.night).signal}"></i></span>
+        <small>${t[1]}</small></button>`).join("")}</div></div>
+    <div class="lk-row"><span class="lk-l">Layout</span>${segRow("density", [["comfortable", "Comfortable"], ["compact", "Compact"], ["tiny", "Tiny"]])}</div>
+    <div class="lk-row"><span class="lk-l">Text size</span>${segRow("textSize", [[0.92, "Small"], [1, "Default"], [1.12, "Large"], [1.25, "Larger"]])}</div>
+    <div class="lk-row"><span class="lk-l">Headline font</span>${segRow("font", [["sans", "Sans serif"], ["serif", "Serif"]])}</div>`;
 }
 
-// 2. Apply: write into CONFIG, validating every value, so the rest of the app keeps reading CONFIG as before.
-function applySettings(st) {
-  CONFIG.INCLUDE_ME = !!st.includeMe;
-  CONFIG.ENRICH_DETAILS = !!st.enrich;
-  CONFIG.CHECK_UPDATES = !!st.checkUpdates;
-  CONFIG.AI.MODEL = String(st.aiModel || DEFAULTS.aiModel).trim() || DEFAULTS.aiModel;
-  CONFIG.AI.REASONING = REASONING_LEVELS.includes(st.aiReasoning) ? st.aiReasoning : DEFAULTS.aiReasoning;
-  CONFIG.ACCOUNT_ID = /^\d+$/.test(String(st.accountId || '').trim()) ? String(st.accountId).trim() : (DEFAULTS.accountId || null);
-}
-
-// 3. Load: called once at the very start, before any branch (app, widget, Shortcuts run).
-function loadSettings() { applySettings(readSettings()); }
-
-// 4. For the page: everything the sheet shows, but never a secret. Only whether a key exists and its last 4 characters.
-function settingsForPage() {
-  const st = readSettings();
-  let tail = '';
-  try { if (Keychain.contains(KC_API_KEY)) tail = Keychain.get(KC_API_KEY).slice(-4); } catch (e) {}
-  return Object.assign(st, {
-    version: VERSION, keySaved: !!tail, keyTail: tail,
-    aiLang: STATE.aiLang, aiMode: STATE.aiMode, aiCustom: STATE.aiCustom,
-    langs: CONFIG.AI.LANGUAGES, modes: CONFIG.AI.MODES.map(m => ({ key: m.key, label: m.label })), reasoningLevels: REASONING_LEVELS,
-  });
+// In the page's click handler:
+case "look": {
+  const k = t.dataset.k, val = k === "textSize" ? +v : v;
+  look[k] = val; send("set", { k, v: val }); render(); renderCfg(); break;
 }
 ```
 
-The fifth piece is the save handler in Step 5. Three rules hold throughout:
+Each swatch previews its palette: its paper as the background, "Aa" in its ink and a dot in its accent. The Auto swatch is split diagonally between the light and dark palettes.
 
-- **The rest of the app keeps reading `CONFIG`.** Settings only change what is in it, so existing code needs no rewrite.
-- **Settings are stored as one JSON object under one Keychain key.** Secrets and remembered picks keep their own keys (Step 2).
-- **The option lists come from the code**, not from the page, so adding a language or mode in `CONFIG` appears in the sheet automatically.
+## Step 4: tunables, the registry
 
-## Step 4: UX of the entry point and the sheet
+Numbers, limits and lists the app runs on are declared once, in a `CONFIG` registry near the top of the script. The registry is the single source of truth: its defaults, the validation and the Settings fields all come from it, so adding a tunable is one line.
 
-Settings open from a gear icon at the top right of the sticky header, and appear as a bottom sheet over the app, grouped into titled cards with a fixed Cancel and Save bar.
+```javascript
+// Everything tunable lives here; the Settings screen edits these (stored in settings.cfg, defaults below).
+const CONFIG = [
+  ["Checking blogs", [
+    { k: "fetchTimeout", label: "Time limit per blog", help: "How long to wait for one blog before giving up", unit: "s", def: 15, min: 5, max: 60, step: 1 },
+    { k: "concurrency", label: "Blogs checked at once", help: "Higher is faster but heavier on the network", unit: "", def: 6, min: 1, max: 12, step: 1 },
+    { k: "userAgent", label: "Browser identity", help: "The User-Agent sent to blogs; some sites block unknown readers", type: "text", def: DEFAULT_UA },
+  ]],
+  ["Keeping posts", [
+    { k: "maxAgeDays", label: "Keep posts for", help: "Older posts are removed unless you rated them", unit: "days", def: 90, min: 7, max: 365, step: 7 },
+    { k: "maxArticles", label: "Keep at most", help: "Rated posts are kept first, then the newest", unit: "posts", def: 2000, min: 200, max: 10000, step: 100 },
+  ]],
+  ["Invites", [
+    { k: "invitePresets", label: "Quick instructions", help: "One per line; shown as chips in the invite composer", type: "lines", def: ["Short and casual", "For my team on Slack", "Ask what they think"] },
+  ]],
+];
+const CFG_FLAT = CONFIG.flatMap(([, items]) => items);
+const cfgDef = k => CFG_FLAT.find(x => x.k === k);
+const cfg = k => { const v = settings.cfg && settings.cfg[k]; return v === undefined ? cfgDef(k).def : v; };
+function setCfg(k, v) {
+  const d = cfgDef(k);
+  if (!d) return;
+  settings.cfg = settings.cfg || {};
+  if (v === null) { delete settings.cfg[k]; return; }   // Reset
+  if (d.type === "text") v = String(v || "").trim() || d.def;
+  else if (d.type === "lines") { v = String(Array.isArray(v) ? v.join("\n") : v || "").split("\n").map(x => x.trim()).filter(Boolean).slice(0, 20); if (!v.length) v = d.def; }
+  else {
+    v = Number(String(v).replace(",", "."));   // accept a decimal comma
+    if (!isFinite(v)) v = d.def;
+    v = Math.min(d.max, Math.max(d.min, v));
+    v = d.step < 1 ? Math.round(v / d.step) * d.step : Math.round(v);
+    v = Number(v.toFixed(2));
+  }
+  if (JSON.stringify(v) === JSON.stringify(d.def)) delete settings.cfg[k]; else settings.cfg[k] = v;   // store only what differs
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `k` | Key in `settings.cfg`; never rename one, or the user's value is lost |
+| `label`, `help` | What the user gets, and the effect or trade-off (copy guidelines below) |
+| `unit` | Shown after the number: s, min, h, days, posts, chars |
+| `def`, `min`, `max`, `step` | Default and the safe range; out-of-range input is clamped, not rejected |
+| `type` | Omitted for numbers (stepper); `"text"` for one line; `"lines"` for a list, one item per line |
+
+Rules:
+
+- **The code reads `cfg("key")` everywhere**, never the literal. A tunable that the code doesn't read through `cfg` is a bug.
+- **Only changed values are stored.** Setting a value back to its default deletes it, so a future release can improve a default and everyone who never touched it gets the improvement.
+- **Validation lives on the Scriptable side** (`setCfg`). The page may show anything; what is stored is always in range.
+- **Side effects run right after the change**, on the Scriptable side: shrinking "Keep at most" prunes immediately, not at the next check.
+
+## Step 5: the Settings sheet
 
 ### Entry point
 
-- **Where:** the header's brand row, right-aligned, left of any refresh button. The header is sticky, so Settings is reachable from anywhere.
-- **Icon:** a line-drawn gear as inline SVG, never a text symbol like ⚙︎, which fonts draw at unpredictable sizes. Same size, stroke and colour as its neighbours: 22 by 22 points, stroke 2, `currentColor`.
-- **Tap target:** 40 by 40 points, transparent background, `aria-label="Settings"`.
+- **Where:** the header's top-right action group, left of refresh. The header stays reachable while scrolling.
+- **Icon:** an inline SVG line icon, never a text symbol like ⚙︎, which fonts draw at unpredictable sizes. BlogPulse uses a sliders glyph. Same size, stroke and colour as its neighbours: 20 by 20 inside the button, stroke 2, `currentColor`.
+- **Button:** 40 by 40, round, `--sheet` background with a `--rule` border (the shared `.icon` style), `aria-label="Settings"`.
+
+```javascript
+const SETTINGS_SVG = `<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>`;
+// in the header:
+`<div class="tb-a"><button class="icon" data-act="cfgopen" aria-label="Settings">${SETTINGS_SVG}</button>` +
+`<button class="icon spin" data-act="refresh" aria-label="Refresh">${REFRESH_SVG}</button></div>`
+```
 
 ### Sheet anatomy
 
 | Part | Spec |
 | --- | --- |
-| Backdrop | Fixed, full screen, black at 55%. Tap = Cancel. |
-| Panel | Bottom sheet, full width, max 92% of the screen height, top corners 20, slides up in 0.22 s. Page background colour. |
-| Header | Card colour. Title "Settings" 18 bold on the left; close ✕ on the right, 38 round, soft background, text colour (visible in both themes). |
-| Body | Scrolls on its own (`overscroll-behavior: contain`), padding 14. The page behind does not scroll. |
-| Section | Small uppercase title, 12 bold, muted, 0.04 em letter spacing, 16 above it. Then one card: card colour, corners 14. |
-| Row | Padding 12 by 14, hairline divider between rows. Label 15; optional helper text 12, muted, under it. |
-| Footer | Fixed under the body, card colour. Cancel (ghost) and Save (accent), 1 : 2 widths, 12 tall padding, safe-area padding at the bottom. |
-| Error line | Red, 13, above the footer, only while there is an error. |
+| Sheet | Full screen, slides up in 0.28 s (`transform: translateY(102%)` → none), `--paper` background, scrolls on its own; the page behind is locked |
+| Header | Sticky. "Settings" in the display font, 24 × `--ts`, bold, left; **Done** in the accent colour, right. Top padding includes the safe area |
+| Hint | "Changes apply right away and are kept on this iPhone." in muted 13 × `--ts` |
+| Section title | Display font, 17 × `--ts`, bold, 26 above |
+| Switch row | Label (semibold) and one muted line under it, switch right (46 × 28, accent when on); divider under the row |
+| Segmented control | Full width, equal buttons, the selected one in `--ink` on `--paper` |
+| Swatches | A row of 50 × 50 previews with the name under each; the selected one outlined in the accent; scrolls sideways if needed |
+| Tunable | Label with **Reset** on the right when changed, a dot after the label when changed, help line; then − field + unit, with "5–60 — original 15" under it. Text and list tunables get a full-width field instead |
+| Footer | "3 settings changed" or "All settings are at their original values", and **Reset all** (danger, two taps) |
 
-### Controls
+Section order, the same in every app:
 
-| Setting kind | Control | Row layout |
-| --- | --- | --- |
-| On or off | iOS-style switch, 51 by 31, green when on | Label left, switch right |
-| One of a fixed list | `select` styled as a field | Label above, field full width |
-| Short text (model name, ID) | Text input, autocorrect and autocapitalise off; numeric keyboard for IDs | Label above, field full width |
-| Secret (API key) | Password input that is always empty; status line "Saved key ending …WXYZ"; a Remove saved key button | Label, status, field, button stacked |
-| Long text (prompt) | Text area, 3 rows, with a character limit | Label and helper above, field full width |
-| Action (Check now) | Small ghost button, never wrapping | Label and result left, button right |
-| Read-only info (version) | Row label, result line as helper text | Label left |
+1. **Appearance** (Step 3).
+2. **The app's own sections**, most used first (BlogPulse: Reading).
+3. **Updates**: offer switch, then "Check for updates now" with its result line.
+4. **Tunables**, one section per registry group, in registry order.
 
-All fields use 16-point text, which stops iOS zooming in when they are tapped, and the app's colour variables, so light and dark mode come for free.
-
-### Section order
-
-Order sections by how often people come for them, and keep it the same in every app:
-
-1. **The app's main feature** (StravaFeed: AI comments): keys first, then the choices people change most.
-2. **Content and display** (StravaFeed: Digest).
-3. **Updates**: the offer switch, then version and Check now. This doubles as the About row.
-4. **Advanced**: IDs and anything most people should leave alone, always last.
-
-## Step 5: saving and what happens after Save
-
-Nothing is saved until **Save**, and Save either stores everything or nothing: it validates first, and on any error keeps the sheet open with one red line saying what to fix.
-
-Every setting belongs to one effect class, decided when you add it. The class sets what the app does after saving and what the confirmation says:
-
-| Effect class | What happens after Save | Confirmation | StravaFeed settings |
-| --- | --- | --- | --- |
-| **Next use** | Nothing visible; the new value is read the next time the feature runs | "Settings saved" | API key, model, thinking effort |
-| **Redraw** | The current screen is drawn again from data already loaded | "Settings saved" | Language, mood, custom prompt, names on widget, update offers |
-| **Reload** | The data is fetched again, then redrawn | "Saved. Reloading the feed…" | Show my own activities, load extra details |
-| **Restart** | Applies the next time the app opens | "Saved. The new athlete ID applies next time you open the digest." | Athlete ID |
-
-The save handler returns the strongest class among the values that changed, and the app acts on that. Validation lives on the Scriptable side, never only in the page:
+### Page code
 
 ```javascript
-if (head === 'settings-save') {
-  let ok = false, msg = '';
-  try {
-    const v = JSON.parse(p.data || '{}'), before = readSettings();
-    const key = String(v.newKey || '').trim();
-    if (key && !/^sk-/.test(key)) throw new Error('That API key does not look like an OpenAI key (it starts with sk-).');
-    if (v.accountId && !/^\d+$/.test(String(v.accountId).trim())) throw new Error('The account ID is the number in your profile link.');
-    const st = {
-      includeMe: !!v.includeMe, enrich: !!v.enrich, checkUpdates: !!v.checkUpdates,
-      aiModel: String(v.aiModel || '').trim() || DEFAULTS.aiModel,
-      aiReasoning: REASONING_LEVELS.includes(v.aiReasoning) ? v.aiReasoning : DEFAULTS.aiReasoning,
-      accountId: String(v.accountId || '').trim(),
-    };
-    Keychain.set(KC_SETTINGS, JSON.stringify(st));
-    applySettings(st);
-    if (key) Keychain.set(KC_API_KEY, key);                                   // secret: only when a new one was typed
-    if (v.removeKey && !key && Keychain.contains(KC_API_KEY)) Keychain.remove(KC_API_KEY);
-    // remembered picks (Step 6) are saved through the same helpers the in-app controls use
-    ok = true;
-    msg = (before.includeMe !== st.includeMe || before.enrich !== st.enrich) ? 'reload' : 'render';
-    if (st.accountId !== before.accountId) msg = 'restart';
-  } catch (e) { msg = String(e.message || e); }
-  await js(`window.__done(${JSON.stringify(p.req)}, ${ok}, ${JSON.stringify(msg)})`);
-  if (ok && msg !== 'restart') await showMainScreen(msg === 'reload');   // redraw, or reload then redraw
-  return;
+let cfgOpen = false, cfgArmed = false;
+const cfgItem = k => { for (const sec of S.cfgSchema) for (const d of sec.items) if (d.k === k) return d; return null; };
+const cfgChanged = k => { const d = cfgItem(k); return d && JSON.stringify(S.cfg[k]) !== JSON.stringify(d.def); };
+const fmtCfg = (d, v) => d.step && d.step < 1 ? Number(v).toFixed(String(d.step).split(".")[1].length) : String(v);
+function renderCfg() {
+  const el = $("#cfgsheet"), keepTop = el.scrollTop;
+  el.classList.toggle("open", cfgOpen); lockBody();
+  if (!cfgOpen) return;
+  const field = d => {
+    const v = S.cfg[d.k], ch = cfgChanged(d.k);
+    const reset = ch ? `<button class="link small" data-act="cfgreset" data-k="${d.k}">Reset</button>` : "";
+    const head = `<div class="cfg-h"><b>${esc(d.label)}</b>${reset}</div>${d.help ? `<small class="muted">${esc(d.help)}</small>` : ""}`;
+    if (d.type === "text") return `<div class="cfg ${ch ? "ch" : ""}">${head}<input class="cfgin wide" data-k="${d.k}" value="${esc(v)}" autocapitalize="off" autocorrect="off" spellcheck="false"></div>`;
+    if (d.type === "lines") return `<div class="cfg ${ch ? "ch" : ""}">${head}<textarea class="cfgin wide" data-k="${d.k}" rows="${Math.max(4, v.length + 1)}">${esc(v.join("\n"))}</textarea></div>`;
+    return `<div class="cfg ${ch ? "ch" : ""}">${head}
+      <div class="stepper"><button data-act="cfgstep" data-k="${d.k}" data-v="-1" aria-label="Decrease" ${v <= d.min ? "disabled" : ""}>−</button>
+      <input class="cfgin" data-k="${d.k}" value="${fmtCfg(d, v)}" inputmode="decimal" aria-label="${esc(d.label)}">
+      <button data-act="cfgstep" data-k="${d.k}" data-v="1" aria-label="Increase" ${v >= d.max ? "disabled" : ""}>+</button>
+      <span class="unit">${esc(d.unit || "")}</span><span class="range">${fmtCfg(d, d.min)}–${fmtCfg(d, d.max)}${ch ? ` — original ${fmtCfg(d, d.def)}` : ""}</span></div></div>`;
+  };
+  const changed = Object.keys(S.cfg).filter(cfgChanged).length;
+  el.innerHTML = `<div class="sh-head"><h2>Settings</h2><button class="link" data-act="cfgclose">Done</button></div><div class="sh-body">
+    <p class="hint">Changes apply right away and are kept on this iPhone.</p>
+    <h3 class="sec">Appearance</h3>${lookHTML()}
+    <h3 class="sec">Reading</h3>
+    <div class="srow"><div class="grow"><b>Mark as read when opened</b><small class="muted">Off: you mark posts read yourself</small></div><button class="switch ${S.settings.readOnOpen ? "on" : ""}" data-act="toggle" data-v="readOnOpen" aria-label="Mark as read when opened"></button></div>
+    <h3 class="sec">Updates</h3>
+    <div class="srow"><div class="grow"><b>Offer new versions</b><small class="muted">You have BlogPulse ${esc(S.version)}. “Later” waits two days.</small></div><button class="switch ${S.settings.checkUpdates ? "on" : ""}" data-act="toggle" data-v="checkUpdates" aria-label="Offer new versions"></button></div>
+    <div class="srow"><div class="grow"><b>Check for updates now</b><small id="updmsg" class="muted" aria-live="polite"></small></div><button class="sm" data-act="updcheck">Check</button></div>
+    ${S.cfgSchema.map(sec => `<h3 class="sec">${esc(sec.title)}</h3>${sec.items.map(field).join("")}`).join("")}
+    <div class="aic-btns cfg-foot"><span class="note">${changed ? changed + " setting" + (changed === 1 ? "" : "s") + " changed" : "All settings are at their original values"}</span>
+      ${changed ? `<button class="sm danger ${cfgArmed ? "armed" : ""}" data-act="cfgall">${cfgArmed ? "Confirm reset" : "Reset all"}</button>` : ""}</div>
+  </div>`;
+  el.scrollTop = keepTop;   // re-renders must not jump the user back to the top
 }
-```
 
-A secret field that is left empty means "keep the saved one", and the only way to delete it is the explicit Remove button. That way, saving any other setting can never wipe a key by accident.
-
-## Step 6: keep settings and in-app controls in sync
-
-Some settings can also be changed right where they are used, like StravaFeed's mood chips and EN/LT buttons in the comment box. Both places must read and write the same value, or the app shows two different answers.
-
-- **One home per value.** Each remembered pick lives in a `STATE` object on the Scriptable side and in its own Keychain key (`myapp-ai-mode`, `myapp-ai-lang`, `myapp-ai-custom`).
-- **Inline controls save immediately.** A tap on a mood chip sends `setmode`, which updates `STATE` and the Keychain at once; no Save button.
-- **The sheet saves the same keys.** Its Save writes `STATE` and those same Keychain keys, through the same helpers.
-- **Both redraw from `STATE`.** The sheet is built fresh from `settingsForPage()` every time it opens, and after Save the main screen is redrawn, so chips show the sheet's choice.
-- **Validate in both places.** An inline control and the sheet both reject values not in the code's list, so a stale page can't store a mode that no longer exists.
-
-A setting deserves an inline control only when people change it mid-task (tone of the next comment). Everything else lives only in the sheet.
-
-## Step 7: page-side code for the sheet
-
-The sheet is built from a list of sections and rows, so each app only writes its own `SETTINGS_SCHEMA`; the builder, save and close code stay identical everywhere. It talks to Scriptable through the app's usual bridge, `send(action, params, callback)`. The code is plain ES5 with no backticks or `${`, because the page script usually sits inside a template string on the Scriptable side.
-
-```javascript
-// Each app edits only this list. id = key in the settings object; type = one of the controls in Step 4.
-var SETTINGS_SCHEMA = [
-  { title: 'AI comments', rows: [
-    { type: 'secret',   id: 'newKey',      label: 'OpenAI API key', help: 'Create one at platform.openai.com.' },
-    { type: 'select',   id: 'aiMode',      label: 'Default mood', options: function (st) { return st.modes.map(function (m) { return [m.key, m.label]; }); } },
-    { type: 'textarea', id: 'aiCustom',    label: 'Custom prompt', help: 'Used when the mood is Custom', max: 200 },
-    { type: 'select',   id: 'aiLang',      label: 'Language', options: function (st) { return st.langs.map(function (l) { return [l[1], l[1]]; }); } },
-    { type: 'text',     id: 'aiModel',     label: 'Model', help: 'OpenAI model name' },
-    { type: 'select',   id: 'aiReasoning', label: 'Thinking effort', help: 'Higher is cleverer but slower', options: function (st) { return st.reasoningLevels.map(function (r) { return [r, r.charAt(0).toUpperCase() + r.slice(1)]; }); } } ] },
-  { title: 'Content', rows: [
-    { type: 'switch', id: 'includeMe', label: 'Show my own activities' },
-    { type: 'switch', id: 'enrich',    label: 'Load extra details', help: 'Heart rate, PRs, start times' } ] },
-  { title: 'Updates', rows: [
-    { type: 'switch', id: 'checkUpdates', label: 'Offer new versions' },
-    { type: 'action', id: 'checkNow', label: function (st) { return 'MyApp v' + st.version; }, button: 'Check now', act: 'update-check' } ] },
-  { title: 'Advanced', rows: [
-    { type: 'text', id: 'accountId', label: 'Account ID', help: 'Leave empty to detect it. Applies next time you open the app.', numeric: true } ] }
-];
-
-function escH(t) { var d = document.createElement('div'); d.textContent = String(t == null ? '' : t); return d.innerHTML; }
-function rowHtml(r, st) {
-  var label = typeof r.label === 'function' ? r.label(st) : r.label, id = 's-' + r.id;
-  var head = '<div class="setl">' + escH(label) + (r.help || r.type === 'secret' || r.type === 'action' ? '<small' + (r.type === 'action' ? ' id="' + id + '-msg"' : '') + '>' +
-    (r.type === 'secret' ? (st.keySaved ? 'Saved key ending <b>…' + escH(st.keyTail) + '</b>. Paste a new one to replace it.' : 'No key saved yet. ' + escH(r.help || '')) : escH(r.help || '')) + '</small>' : '') + '</div>';
-  if (r.type === 'switch') return '<div class="setr">' + head + '<label class="sw"><input type="checkbox" id="' + id + '"' + (st[r.id] ? ' checked' : '') + '><span></span></label></div>';
-  if (r.type === 'action') return '<div class="setr">' + head + '<button class="ghost small" data-act="set-action" data-do="' + r.act + '" data-for="' + id + '">' + escH(r.button) + '</button></div>';
-  var field = r.type === 'select' ? '<select id="' + id + '">' + r.options(st).map(function (o) { return '<option value="' + escH(o[0]) + '"' + (o[0] === st[r.id] ? ' selected' : '') + '>' + escH(o[1]) + '</option>'; }).join('') + '</select>'
-    : r.type === 'textarea' ? '<textarea id="' + id + '" rows="3" maxlength="' + (r.max || 500) + '">' + escH(st[r.id] || '') + '</textarea>'
-    : r.type === 'secret' ? '<input type="password" id="' + id + '" autocomplete="off" placeholder="' + (st.keySaved ? 'Paste a new key to replace' : 'Paste your key') + '">' + (st.keySaved ? '<button class="ghost small" data-act="set-removekey">Remove saved key</button>' : '')
-    : '<input type="text" id="' + id + '" autocomplete="off" autocapitalize="off" spellcheck="false"' + (r.numeric ? ' inputmode="numeric"' : '') + ' value="' + escH(st[r.id] || '') + '">';
-  return '<div class="setr col">' + head + field + '</div>';
-}
-function openSettings() {
-  if (document.getElementById('set')) return;
-  send('settings-get', {}, function (ok, msg) {
-    var st; try { st = JSON.parse(msg); } catch (e) { toast('Settings could not be loaded'); return; }
-    var body = SETTINGS_SCHEMA.map(function (sec) { return '<div class="setg"><h3>' + escH(sec.title) + '</h3><div class="setc">' + sec.rows.map(function (r) { return rowHtml(r, st); }).join('') + '</div></div>'; }).join('');
-    var ov = document.createElement('div'); ov.id = 'set';
-    ov.innerHTML = '<div class="setp" role="dialog" aria-label="Settings"><div class="seth"><b>Settings</b><button class="lbx" data-act="set-close" aria-label="Close settings">✕</button></div>' +
-      '<div class="setb">' + body + '<div class="setmsg" aria-live="polite"></div></div>' +
-      '<div class="setf"><button class="ghost" data-act="set-close">Cancel</button><button data-act="set-save">Save</button></div></div>';
-    document.body.appendChild(ov); document.body.style.overflow = 'hidden';
-    ov.addEventListener('click', function (e) { if (e.target === ov) closeSettings(); });   // backdrop = Cancel
-  });
-}
-function closeSettings() { var ov = document.getElementById('set'); if (ov) ov.remove(); document.body.style.overflow = ''; }
-function saveSettings(btn) {
-  var ov = document.getElementById('set'), data = { removeKey: ov.dataset.removeKey === '1' };
-  SETTINGS_SCHEMA.forEach(function (sec) { sec.rows.forEach(function (r) {
-    var el = document.getElementById('s-' + r.id); if (!el || r.type === 'action') return;
-    data[r.id] = r.type === 'switch' ? el.checked : el.value.trim();
-  }); });
-  btn.disabled = true; btn.textContent = 'Saving…';
-  send('settings-save', { data: JSON.stringify(data) }, function (ok, msg) {
-    btn.disabled = false; btn.textContent = 'Save';
-    if (!ok) { var em = ov.querySelector('.setmsg'); em.textContent = msg || 'Could not save'; em.scrollIntoView({ block: 'nearest' }); return; }
-    closeSettings();
-    toast(msg === 'restart' ? 'Saved. This applies next time you open the app.' : msg === 'reload' ? 'Saved. Reloading…' : 'Settings saved');
-  });
-}
 // In the page's click handler:
-//   if (act === 'settings') openSettings();
-//   if (act === 'set-close') closeSettings();
-//   if (act === 'set-save') saveSettings(t);
-//   if (act === 'set-removekey') { var so = document.getElementById('set'); so.dataset.removeKey = '1'; t.disabled = true; t.textContent = 'Key will be removed when you save'; }
-//   if (act === 'set-action') { var m = document.getElementById(t.dataset.for + '-msg'); t.disabled = true; if (m) m.textContent = 'Checking…';
-//     send(t.dataset.do, {}, function (ok, res) { t.disabled = false; if (m) m.textContent = res || ''; }); }
+case "toggle": S.settings[v] = !S.settings[v]; send("set", { k: v, v: S.settings[v] }); renderCfg(); break;
+case "cfgopen": cfgOpen = true; renderCfg(); break;
+case "cfgclose": cfgOpen = false; cfgArmed = false; renderCfg(); break;
+case "cfgreset": { const d = cfgItem(t.dataset.k); S.cfg[d.k] = d.def; send("cfg", { k: d.k, v: null }); renderCfg(); break; }
+case "cfgstep": {
+  const d = cfgItem(t.dataset.k), step = d.step || 1;
+  const nv = Number(Math.min(d.max, Math.max(d.min, Number(S.cfg[d.k]) + step * +v)).toFixed(2));
+  S.cfg[d.k] = nv; send("cfg", { k: d.k, v: nv }); renderCfg(); break;
+}
+case "cfgall":
+  if (cfgArmed) { cfgArmed = false; send("cfg", { k: "*" }); }
+  else { cfgArmed = true; renderCfg(); setTimeout(() => { if (cfgArmed) { cfgArmed = false; renderCfg(); } }, 3500); }
+  break;
+
+// Typed values arrive through "change", when the field loses focus:
+document.addEventListener("change", e => {
+  if (e.target.classList && e.target.classList.contains("cfgin")) {
+    const d = cfgItem(e.target.dataset.k);
+    send("cfg", { k: d.k, v: d.type === "lines" ? e.target.value.split("\n") : e.target.value });
+  }
+});
 ```
 
-The matching CSS is in StravaFeed's script: copy every rule that starts with `#set`, `.set`, `.sw` and `.keyst`. They use the app's own colour variables (`--bg`, `--card`, `--soft`, `--fg`, `--mut`, `--line`, `--accent`); rename those if the app calls them something else.
+The page code above is modern JavaScript because BlogPulse's page is a real function serialised with `toString()`. If an app builds its page inside a template string, write the same logic in ES5 without backticks or `${`.
+
+### CSS
+
+```css
+.sheet{position:fixed;inset:0;z-index:10;background:var(--paper);transform:translateY(102%);transition:transform .28s ease;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet.open{transform:none}
+#cfgsheet{z-index:13}
+body.locked{overflow:hidden}
+.tb-a{display:flex;gap:6px}
+.icon{width:40px;height:40px;border-radius:20px;display:grid;place-items:center;background:var(--sheet);border:1px solid var(--rule)}
+.icon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sh-head{position:sticky;top:0;z-index:2;background:var(--paper);display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 14px) 18px 12px;border-bottom:1px solid var(--rule)}
+.sh-head h2{font:700 calc(24px * var(--ts))/1 var(--display);margin:0}
+.sh-body{padding:16px 18px calc(env(safe-area-inset-bottom) + 40px)}
+.link{color:var(--signal);font-weight:600;font-size:16px}
+.link.small{font-size:calc(14px * var(--ts))}
+.hint{font-size:calc(13px * var(--ts));color:var(--muted);margin:8px 2px 0}
+.sec{font:700 calc(17px * var(--ts))/1.2 var(--display);margin:26px 0 6px}
+.srow{display:flex;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid var(--rule)}
+.grow{flex:1;min-width:0}
+.grow b{display:block;font-weight:600}
+.grow small{display:block;font-size:calc(13px * var(--ts));color:var(--ink-2)}
+.switch{width:46px;height:28px;border-radius:14px;background:var(--rule);position:relative;flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:11px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s}
+.switch.on{background:var(--signal)}
+.switch.on::after{transform:translateX(18px)}
+.sm{font-size:calc(13px * var(--ts));padding:6px 11px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);white-space:nowrap}
+.danger{color:var(--danger)}
+.danger.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.seg{display:flex;border:1px solid var(--rule);border-radius:9px;overflow:hidden;flex:none;background:var(--sheet)}
+.seg button{font-size:calc(12.5px * var(--ts));padding:6px 10px;color:var(--ink-2);white-space:nowrap}
+.seg button.on{background:var(--ink);color:var(--paper);font-weight:600}
+.seg.wide button{flex:1;text-align:center;padding:9px 4px;font-size:calc(13.5px * var(--ts))}
+.lk-row{margin:10px 0 14px}
+.lk-l{display:block;font-size:calc(13px * var(--ts));font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.sws{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;padding:3px 3px 2px}
+.sws::-webkit-scrollbar{display:none}
+.sw{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}
+.sw .prev{position:relative;width:50px;height:50px;border-radius:13px;display:grid;place-items:center;border:1px solid rgba(127,127,127,.35);font:700 18px/1 var(--display)}
+.sw .prev i{position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-radius:5px}
+.sw.on .prev{outline:2.5px solid var(--signal);outline-offset:2px}
+.sw small{font-size:12px;color:var(--ink-2)}
+.sw.on small{color:var(--ink);font-weight:600}
+.cfg{padding:12px 0;border-bottom:1px solid var(--rule)}
+.cfg.ch .cfg-h b::after{content:"";display:inline-block;width:7px;height:7px;border-radius:4px;background:var(--signal);margin-left:7px;vertical-align:2px}
+.cfg-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cfg-h b{font-weight:600}
+.cfg small{display:block;font-size:calc(13px * var(--ts));margin-top:2px}
+.stepper{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.stepper button{width:38px;height:36px;border-radius:9px;border:1px solid var(--rule);background:var(--sheet);font-size:20px;font-weight:600;text-align:center}
+.stepper button[disabled]{opacity:.35}
+.stepper input{width:86px;text-align:center;font:600 16px var(--sans);padding:7px 6px;border-radius:9px;border:1px solid var(--rule);background:var(--paper);color:var(--ink)}
+.stepper .unit{font-size:calc(14px * var(--ts));color:var(--ink-2);min-width:2.5em}
+.stepper .range{flex-basis:100%;font-size:calc(12px * var(--ts));color:var(--muted)}
+.cfgin.wide{display:block;width:100%;margin-top:8px;font:16px/1.45 var(--sans);padding:9px 11px;border-radius:9px;border:1px solid var(--rule);background:var(--paper);color:var(--ink)}
+.cfgin:focus{outline:2px solid var(--signal);outline-offset:-1px}
+.cfg-foot{margin-top:18px}
+```
+
+Input fields stay at 16px regardless of text size; anything smaller makes iOS zoom the page when the field is tapped.
+
+## Step 6: saving
+
+There is no Save button: every control sends its change the moment it is used, and the Scriptable side validates, stores and pushes fresh state back.
+
+| Action | Payload | What the Scriptable side does |
+| --- | --- | --- |
+| `set` | `k`, `v` | Stores `settings[k]` if `k` is on the allowed list; saves |
+| `cfg` | `k`, `v` (`null` = reset one, `k: "*"` = reset all) | `setCfg`, then any side effect (prune, re-sort); saves; pushes state |
+| `updcheck` | none | From the in-app updates blueprint: clears "Later" and checks now |
+
+```javascript
+// Inside the app's action handler (m = the decoded message from the page)
+case "set": if (["groupBy", "view", "readOnOpen", "theme", "density", "font", "textSize", "checkUpdates"].includes(m.k)) settings[m.k] = m.v; break;   // then saveAll()
+case "cfg": {
+  if (m.k === "*") settings.cfg = {}; else setCfg(m.k, m.v);
+  if (m.k === "*" || m.k === "maxAgeDays" || m.k === "maxArticles") prune();   // side effects apply now
+  saveAll(); return push();
+}
+```
+
+Add to the state the app sends the page:
+
+```javascript
+cfg: Object.fromEntries(CFG_FLAT.map(d => [d.k, cfg(d.k)])),        // effective values
+cfgSchema: CONFIG.map(([title, items]) => ({ title, items })),
+settings: { /* …the app's own fields… */ readOnOpen: settings.readOnOpen, checkUpdates: settings.checkUpdates !== false,
+  theme: settings.theme, density: settings.density, font: settings.font, textSize: settings.textSize },
+palettes: PALETTES, version: VERSION,
+```
+
+What a change does, and what the user is told:
+
+| Effect | When | Example | Feedback |
+| --- | --- | --- | --- |
+| **Redraw** | Looks and display choices | Colours, layout, text size | The page changes under the open sheet |
+| **Apply now** | A tunable with a side effect | Keep at most | Done by the time the user scrolls back |
+| **Next run** | Something used only during a check or by the widget | Time limit per blog, widget refresh | Say so in the help line ("applies to newly found posts") |
+
+The `set` allow-list matters: the page can only change the keys listed, so a stale or tampered page can't write anything else into the settings file.
+
+## Step 7: secrets
+
+Keys and tokens are not settings. Each lives in its own Keychain entry, named with the app's prefix, and is typed into a native secure prompt, never into the page: the page's history, logs and bridge URLs could all carry it.
+
+- **In the sheet**, a secret is a row showing "Saved, ending …WXYZ" or "Not set", with **Add** or **Change** (opens the native prompt) and **Remove** (two taps; turns into **Confirm** for 3.5 seconds).
+- **Saved at once** when the prompt is confirmed; Done or closing the sheet never touches it.
+- **The page gets only the last four characters**, enough for people to recognise the key.
+- **Changing it is a separate action** (`secret-set`, `secret-remove`), handled before anything that needs the app's data, so a broken key can always be fixed.
 
 ## Step 8: wiring
 
-Four connections finish the job:
-
-1. **Load first, everywhere.** Call `loadSettings()` once at the entry point, before the app, widget and Shortcuts branches. Otherwise a widget or automation silently runs on defaults.
-
-   ```javascript
-   loadSettings();
-   if (config.runsInWidget || config.runsInAccessoryWidget) await renderWidget();
-   else if (wantsRefreshOnly) await refreshOnly();
-   else await main();
-   ```
-2. **The header button.** Add the gear before refresh, both as matching line icons (Step 4):
-
-   ```javascript
-   `<button class="hbtn" data-act="settings" aria-label="Settings">${ICON_GEAR}</button>` +
-   `<button class="hbtn" data-act="refresh" aria-label="Refresh">${ICON_REFRESH}</button>`
-   ```
-3. **Action handlers** in `shouldAllowRequest`, before any code that needs the app's data loaded, so Settings works even if loading failed: `settings-get` (reply with `JSON.stringify(settingsForPage())`), `settings-save` (Step 5), and `update-check` if the app has the in-app update pattern.
-4. **Overlays and gestures.** Add the sheet's id (`set`) to every check for an open overlay, such as pull to refresh, so dragging inside the sheet never reloads the app.
-
-If the app also has the update pattern, its update switch and Check now row belong in the Updates section of this sheet. Check now clears any "Later" snooze and checks immediately.
+1. **Load first, everywhere.** Load `settings` at the top of the script, before the app, widget and Shortcuts branches.
+2. **Apply the look before the first paint.** Call `applyLook()` as soon as state arrives, so the page never flashes the default palette.
+3. **The header button** goes left of refresh, both as matching line icons (Step 5).
+4. **Stacking.** The Settings sheet sits above the page's other sheets (`z-index: 13` in BlogPulse); sheets opened from it go higher.
+5. **Gestures.** Add the sheet to every "is an overlay open" check, such as pull to refresh, so dragging inside it never reloads the app.
+6. **The widget** reads the same `settings` and `cfg()` values. Where it draws colours, it uses the palette in use (Auto: light or dark by the system).
 
 ## Copy guidelines
 
@@ -338,63 +485,62 @@ The words decide whether a user understands a setting without reading the code. 
 
 | Element | Rule | Do | Don't |
 | --- | --- | --- | --- |
-| Section title | One or two words, the user's area | AI comments, Digest | AI config, Misc |
-| Row label | What the user gets, sentence case | Show my own activities | INCLUDE\_ME, Include own |
+| Section title | One or two words, the user's area | Appearance, Reading, Keeping posts | Config, Misc |
+| Row label | What the user gets, sentence case | Mark as read when opened | readOnOpen, Auto-read |
 | Switch label | Phrased so on means yes | Offer new versions | Disable update offers |
-| Helper text | The effect or the trade-off, one short line | Higher is cleverer but slower | Sets the reasoning parameter |
-| Empty-means helper | Say what empty does | Leave empty to detect it | Optional |
-| Delayed effect | Say when it applies | Takes effect next time you open the digest | (nothing) |
-| Secret status | Saved or not, last 4 characters only | Saved key ending …WXYZ | sk-proj-abc… |
-| Validation error | What is wrong and what is expected | The athlete ID is the number from strava.com/athletes/\<ID>. | Invalid input |
-| Confirmation | What happened, plus what is happening next | Saved. Reloading the feed… | Success! |
-
-Keep option names identical wherever they appear: a mood is called "Funny" in both the sheet and the comment box, never "Humorous" in one.
+| Help line | The effect or the trade-off, one short line | Higher is faster but heavier on the network | Sets the concurrency parameter |
+| Off state | Say what happens when off, if it isn't obvious | Off: you mark posts read yourself | (nothing) |
+| Delayed effect | Say when it applies | Applies to newly found posts | (nothing) |
+| Units | Short and plural where needed | s, min, days, posts | seconds (sec.) |
+| Range line | Range, then the original when changed | 5–60 — original 15 | Min 5 Max 60 |
+| Reset | Per item "Reset"; all items "Reset all", then "Confirm reset" | | Restore factory defaults |
+| Appearance options | Exactly: Auto + palette names; Comfortable, Compact, Tiny; Small, Default, Large, Larger; Sans serif, Serif | | Normal, Big, Huge |
 
 ## Checklist
 
 **Audit**
 
-- [ ] Every literal that changes behaviour is listed and sorted: sheet, `CONFIG` only, or code constant (Step 1).
-- [ ] Every sheet setting has a control type, a section, an effect class and copy that follows the guidelines.
-- [ ] Secrets have their own Keychain keys and never reach the page.
+- [ ] Every literal that changes behaviour or looks is listed and sorted (Step 1).
+- [ ] Every tunable has a label, help line, unit, default and safe range, and the code reads it through `cfg()`.
+- [ ] Every colour in the CSS is one of the shared tokens; every font size is `calc(<px> * var(--ts))`.
 
 **Test on a phone**
 
-- [ ] The gear sits left of refresh, both icons the same size.
-- [ ] The sheet opens prefilled with current values, in light and dark mode.
-- [ ] Cancel, ✕ and tapping the backdrop all close without saving.
-- [ ] Each invalid value shows its error line in view, and nothing is saved.
-- [ ] Each effect class does what Step 5 says: next use, redraw, reload, restart.
-- [ ] Saving without touching the key keeps the saved key; Remove saved key deletes it.
-- [ ] Closing and reopening the app keeps every choice.
+- [ ] The settings icon sits left of refresh, both the same size.
+- [ ] Each palette, including Contrast, is readable on every screen; Auto follows the system and switches live when it changes.
+- [ ] Comfortable, Compact and Tiny each change spacing everywhere; Tiny lists stay tappable.
+- [ ] Larger text never truncates buttons or overlaps the header; input fields don't zoom the page when tapped.
+- [ ] Serif changes titles and headings only.
+- [ ] Every change shows at once, and is still there after closing and reopening the app.
+- [ ] A typed tunable outside its range is clamped to the nearest limit; Reset brings back the original; Reset all needs two taps.
+- [ ] Changing a tunable with a side effect (Keep at most) applies it straight away.
 - [ ] Running the installer or an in-app update keeps every choice.
-- [ ] Widgets and Shortcuts runs use the saved values, not the defaults.
-- [ ] Inline controls and the sheet always show the same value.
-- [ ] Tapping a field doesn't zoom the page, and dragging inside the sheet doesn't trigger pull to refresh.
+- [ ] The widget and Shortcuts runs use the saved values, not the defaults.
+- [ ] Dragging inside the sheet doesn't trigger pull to refresh, and re-renders keep the sheet's scroll position.
 
-## Pitfalls learned on StravaFeed
+## Pitfalls
 
-- **Text symbols as icons.** ⚙︎ drew noticeably smaller than ↻ at the same size, so StravaFeed 1.8.1 switched both to SVG line icons.
-- **A close button invisible in one theme.** A ✕ styled for dark backgrounds disappeared in light mode. Give it the soft background and text colour, and check both themes.
-- **Wrapping buttons.** "Check now" broke onto two lines next to long helper text; buttons in rows need `white-space: nowrap` and `flex: none`.
-- **Errors out of sight.** The error line sat below the last field, so a failed save looked like nothing happened. Scroll it into view (Step 7).
-- **Action rows with no place for the result.** An action row needs its result line even without helper text, or Check now looks dead (Step 7).
-- **Loading settings too late.** Apply saved settings at the entry point, or widgets and Shortcuts runs silently use defaults (Step 8).
-- **Keys in the page.** Never send a secret to the page, even to prefill a field. Its last four characters are enough for people to recognise it.
+- **Text symbols as icons.** ⚙︎ and ↻ draw at different sizes in the same font; use SVG line icons (learned on StravaFeed).
+- **Hardcoded colours.** One `#fff` in the CSS breaks the dark palettes. Every colour comes from a token; check all six palettes.
+- **Fixed font sizes.** A size written in plain `px` ignores Text size. Write every size as `calc(<px> * var(--ts))`, except form fields, which stay at 16px so iOS doesn't zoom.
+- **Auto that doesn't follow.** Read `prefers-color-scheme` once and Auto stays wrong until the app restarts; listen for its change event.
+- **Storing every value.** Writing defaults into the file freezes them; a later, better default never reaches existing users. Store only what differs.
+- **Renaming a tunable's key.** The user's value is silently lost. Keep keys forever; change only labels.
+- **Saving on close.** iOS can end the script while the sheet is open. Save after each change.
+- **Wrapping buttons.** "Check" or "Reset" breaking onto two lines next to long help text; buttons in rows need `white-space: nowrap` and `flex: none` (learned on StravaFeed).
+- **Loading settings too late.** Widgets and Shortcuts runs silently use defaults unless settings are loaded before every branch.
 
 ## Prompt for Claude
 
-Paste this into a chat about another app, with this doc's link, to apply the blueprint. Replace the bracketed parts.
+Paste this into a chat about another app, with this doc's link. Replace the bracketed parts.
 
 ```markdown
-Add a Settings sheet to [Go2FGym] following the attached "Settings blueprint for Scriptable apps" exactly:
+Add the shared Settings sheet to [Go2FGym], following the attached doc "Settings for Scriptable apps" exactly, with BlogPulse.js as the reference:
 
-- Repository: github.com/gadominas/[Go2FGym], branch main, script file [Go2FGym.js]
-- Keychain key prefix: [go2fgym-]
+- Repository: github.com/gadominas/[Go2FGym], branch main, script file [Go2FGym.js], app folder [Go2FGym]
 - First audit every hardcoded value (Step 1) and show me the mapping table before writing code; I'll confirm or adjust it
-- Gear icon left of refresh in the sticky header, same SVG icon style and size
-- Use the schema-driven builder from Step 7 and StravaFeed's #set, .set, .sw and .keyst CSS, matched to this app's colour variables
-- Effect classes and confirmations as in Step 5; copy as in the copy guidelines
-- Bump the version and add a releases.json entry with three highlights, if the app has in-app updates
-- Test with the checklist in light and dark mode, then commit and push to main (no pull request)
+- Appearance section exactly as in Step 3: the six palettes plus Auto (adapt the palette colours to this app's brand), Layout, Text size, Headline font; move the app's CSS onto the shared colour, density and text-size tokens
+- App sections: [Workout: rest timer sound, units]; tunables registry groups: [Rest timer, History, Library]
+- Settings icon left of refresh, settings.json in the app folder, only changed tunables stored, per-item Reset and Reset all
+- Run the checklist in every palette, at every text size and layout, then bump VERSION, add a releases.json entry and push to main
 ```
