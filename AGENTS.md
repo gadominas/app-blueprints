@@ -8,11 +8,11 @@ Read this whole file before changing any code.
 
 | Id | File | Raw URL | Reference implementation | Depends on |
 | --- | --- | --- | --- | --- |
-| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
 | `in-app-updates` | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
+| `settings` | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
 | `ai-configuration` | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates` |
 
-When asked to “apply all blueprints”, apply them in this order: `in-app-updates`, `settings`, `ai-configuration`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, and AI configuration comes last.
+When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, and AI configuration comes last.
 
 **Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
 

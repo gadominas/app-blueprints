@@ -19,8 +19,8 @@ This repository fixes that by keeping one answer per problem:
 
 | Blueprint | What it gives an app | Reference app | Updated |
 | --- | --- | --- | --- |
-| [Settings](blueprints/settings.md) | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
 | [In-app updates](blueprints/in-app-updates.md) | `VERSION` + `releases.json`, update check on open, “what’s new” sheet with three highlights, one-tap install, two-day snooze, generated `CHANGELOG.md` | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.6.0 | 2026-10-27 |
+| [Settings](blueprints/settings.md) | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
 | [AI configuration](blueprints/ai-configuration.md) | Claude or OpenAI with keys in the iOS Keychain, model picker from the user’s own key, connection test, one `aiCall` for every request, per-feature token usage with a 14-day chart, “✦ AI” labelling, graceful no-key mode | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.0.0 | 2026-10-28 |
 
 Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
@@ -33,8 +33,8 @@ app-blueprints/
 ├── AGENTS.md                 ← instructions for coding agents (Claude Code, Codex, Cursor, …)
 ├── CLAUDE.md                 ← points Claude Code at AGENTS.md
 ├── blueprints/
-│   ├── settings.md
 │   ├── in-app-updates.md
+│   ├── settings.md
 │   └── ai-configuration.md
 └── templates/
     └── blueprint-template.md ← skeleton for writing a new blueprint

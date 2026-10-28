@@ -348,7 +348,9 @@ Run these on a phone before announcing the first version that contains updates. 
 
 To reset Later while testing, run `Keychain.remove('go2fgym-update-snooze')` in a scratch Scriptable script, using that app's key.
 
-## Pitfalls learned on StravaFeed
+## Pitfalls
+
+All of these were hit on StravaFeed.
 
 - **Old copies can't update themselves.** The check only exists from the version that adds it. Tell existing users to run the installer once more.
 - **Order of definitions.** Scriptable runs the script top to bottom, so declare `VERSION` and the other constants above the code that starts the app. StravaFeed hit "Cannot access before initialization" errors this way, and keeps its start-up call at the very end of the file.

@@ -496,7 +496,7 @@ The words decide whether a user understands a setting without reading the code. 
 | Reset | Per item "Reset"; all items "Reset all", then "Confirm reset" | | Restore factory defaults |
 | Appearance options | Exactly: Auto + palette names; Comfortable, Compact, Tiny; Small, Default, Large, Larger; Sans serif, Serif | | Normal, Big, Huge |
 
-## Checklist
+## Testing checklist
 
 **Audit**
 
