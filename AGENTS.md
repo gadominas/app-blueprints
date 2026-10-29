@@ -11,10 +11,11 @@ Read this whole file before changing any code.
 | `in-app-updates` | In-app updates | 1.0.0 | [blueprints/in-app-updates.md](blueprints/in-app-updates.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/in-app-updates.md | https://github.com/gadominas/StravaFeed (v1.6.0) | — |
 | `settings` | Settings | 1.0.0 | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
 | `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
+| `launch-screen` | Launch screen | 1.0.0 | [blueprints/launch-screen.md](blueprints/launch-screen.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/launch-screen.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.17.1) | — |
 
 A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
-When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, and AI configuration comes last.
+When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, and the launch screen, which touches nothing else, comes last.
 
 **Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
 
@@ -111,6 +112,7 @@ An app carries its trace in three places, which must always agree:
      { id: 'in-app-updates', name: 'In-app updates', version: '1.0.0', since: '1.5.0' },
      { id: 'settings', name: 'Settings', version: '1.0.0', since: '1.7.0' },
      { id: 'ai-configuration', name: 'AI configuration', version: '1.0.0', since: '1.6.0' },
+     { id: 'launch-screen', name: 'Launch screen', version: '1.0.0', since: '1.8.0' },
    ];
    ```
 
@@ -180,7 +182,8 @@ An app carries its trace in three places, which must always agree:
 - Fixed order in the AI sheet: provider in use, other provider, What AI does, Token usage.
 - Destructive actions take two taps with a ~3.5 s **Confirm** state.
 - `<select>` font size is at least 16px; the click handler ignores form controls.
-- Stacking: Settings `z-index: 13`, AI sheet `14`, update sheet `48`.
+- Stacking: Settings `z-index: 13`, AI sheet `14`, update sheet `48`, launch screen `90`.
+- The launch screen is shown 2.4 s and fades out by pure CSS (never only by script), skips on tap, and respects Reduce Motion.
 - Re-renders keep the sheet’s scroll position.
 - AI output is labelled `✦ AI … by <Provider>`.
 - User-facing copy (buttons, toasts, labels) matches the blueprint wording.

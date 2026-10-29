@@ -22,8 +22,9 @@ This repository fixes that by keeping one answer per problem:
 | [In-app updates](blueprints/in-app-updates.md) | 1.0.0 | `VERSION` + `releases.json`, update check on open, “what’s new” sheet with three highlights, one-tap install, two-day snooze, generated `CHANGELOG.md` | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.6.0 | 2026-10-27 |
 | [Settings](blueprints/settings.md) | 1.0.0 | One Settings sheet with the same Appearance section in every app (colour palettes with Auto, layout density, text size, headline font on shared CSS tokens), the app's own switches, Updates, and a registry of tunables with ranges and Reset; changes apply instantly and are saved in `settings.json`, so updates never reset them | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.1.0 | 2026-10-28 |
 | [AI configuration](blueprints/ai-configuration.md) | 1.0.0 | Claude or OpenAI with keys in the iOS Keychain, model picker from the user’s own key, connection test, one `aiCall` for every request, per-feature token usage with a 14-day chart, “✦ AI” labelling, graceful no-key mode | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.0.0 | 2026-10-28 |
+| [Launch screen](blueprints/launch-screen.md) | 1.0.0 | A 2.4 s branded launch screen: the app's logo draws itself, then its name and a three-word tagline; tap to skip, Reduce Motion aware, can never get stuck; five colour variables and the logo's parts are all an app changes | [VisionX](https://github.com/gadominas/VisionX) 1.17.1 | 2026-10-29 |
 
-Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
+Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet), then **Launch screen** (self-contained, touches nothing else). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
 
 ## Repository layout
 
@@ -35,7 +36,8 @@ app-blueprints/
 ├── blueprints/
 │   ├── in-app-updates.md
 │   ├── settings.md
-│   └── ai-configuration.md
+│   ├── ai-configuration.md
+│   └── launch-screen.md
 ├── templates/
 │   └── blueprint-template.md ← skeleton for writing a new blueprint
 └── tools/
