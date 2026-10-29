@@ -12,10 +12,11 @@ Read this whole file before changing any code.
 | `settings` | Settings | 1.0.0 | [blueprints/settings.md](blueprints/settings.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/settings.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.1.0) | — |
 | `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
 | `launch-screen` | Launch screen | 1.0.0 | [blueprints/launch-screen.md](blueprints/launch-screen.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/launch-screen.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.17.1) | — |
+| `widgets` | Widgets | 1.0.0 (draft) | [blueprints/widgets.md](blueprints/widgets.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/widgets.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.19.0, first to ship it) | `settings`, `launch-screen` |
 
 A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
-When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, and the launch screen, which touches nothing else, comes last.
+When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`, `widgets`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, then the launch screen, which touches nothing else, and last the widget, which takes its tunables from Settings and its name and accent from the launch screen.
 
 **Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
 
@@ -113,6 +114,7 @@ An app carries its trace in three places, which must always agree:
      { id: 'settings', name: 'Settings', version: '1.0.0', since: '1.7.0' },
      { id: 'ai-configuration', name: 'AI configuration', version: '1.0.0', since: '1.6.0' },
      { id: 'launch-screen', name: 'Launch screen', version: '1.0.0', since: '1.8.0' },
+     { id: 'widgets', name: 'Widgets', version: '1.0.0', since: '1.9.0' },
    ];
    ```
 
@@ -184,6 +186,7 @@ An app carries its trace in three places, which must always agree:
 - `<select>` font size is at least 16px; the click handler ignores form controls.
 - Stacking: Settings `z-index: 13`, AI sheet `14`, update sheet `48`, launch screen `90`.
 - The launch screen is shown 2.4 s and fades out by pure CSS (never only by script), skips on tap, and respects Reduce Motion.
+- The widget branch (`config.runsInWidget || config.runsInAccessoryWidget`) comes right after settings load and before anything that builds a WebView; a widget run never presents UI and never shows an error. Widgets use the shared frame and brand colours; an app writes only `WIDGET` and `widgetModel()`, and never puts secrets, money hidden from kids, or locked content in a widget.
 - Re-renders keep the sheet’s scroll position.
 - AI output is labelled `✦ AI … by <Provider>`.
 - User-facing copy (buttons, toasts, labels) matches the blueprint wording.
