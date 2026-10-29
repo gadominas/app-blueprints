@@ -4,13 +4,13 @@ title: Widgets for Scriptable apps
 version: 1.0.0
 updated: 2026-10-29
 author: Gediminas Siutilas
-reference: VisionX 1.19.0, the first app to ship it (https://github.com/gadominas/VisionX/blob/main/VisionX.js)
+reference: VisionX 1.19.0 (https://github.com/gadominas/VisionX/blob/main/VisionX.js)
 depends_on: [settings, launch-screen]
 ---
 
 # Widgets for Scriptable apps
 
-> **Status: draft.** Written ahead of its first shipped app, against the rule in the README. VisionX 1.19.0 ships it first and becomes the reference; tag `widgets-v1.0.0` only after that release, and fix this doc wherever VisionX had to differ.
+> **Reference:** VisionX 1.19.0 shipped it first; Strava Daily Digest 1.13.0, BlogPulse 1.8.0, Dienynas+ 1.8.0, Go2FGym 1.12.0 and Reading Stars 1.4.0 followed with the same frame.
 
 ## Overview
 
@@ -33,7 +33,7 @@ The pieces, all inside the app's single script:
 | Piece | Lives in | Job |
 | --- | --- | --- |
 | `WIDGET` | Top of the Widget section | The only per-app values: name parts, accent, icon URL, words |
-| `widgetModel(param)` | Scriptable side, next to the app's data code | Turns the app's own data into the widget model (Step 3) |
+| `widgetModel(param, family)` | Scriptable side, next to the app's data code | Turns the app's own data into the widget model (Step 3) |
 | `saveWidget()` / `readWidget()` | Widget section | The snapshot the app saves and the widget reads |
 | `widgetIcon()` | Widget section | The logo tile, fetched once per app version and cached |
 | `renderWidget(m)`, `renderAccessory()` | Widget section | Draw the shared frame from the model |
@@ -84,7 +84,7 @@ A row counts as 1 line unit plus 0.8 for its sub line; a row with `lines: 3` cou
 | `WIDGET.name` | `['Vision', 'X']` | As on the launch screen: plain part, highlighted part, optional rest (`['Go2', 'F', 'Gym']`) |
 | `WIDGET.accent` | `#E5383B` | The launch screen's `--sp-accent` |
 | `WIDGET.icon` | `REPO_RAW + 'docs/icon-1024.png'` | The 1024 px app icon every app already has in `docs/` |
-| `WIDGET.words` | English | Translate for apps with a language setting |
+| `WIDGET.words` | English | Translate for apps with a language setting. `WIDGET` is built before settings load, so an app with a language setting makes `words` a getter that reads the language when the widget draws (Dienynas+, Reading Stars) |
 
 Every app's accent, from its logo:
 
@@ -188,7 +188,7 @@ function wFit(rows, budget, max) {
   let used = 0;
   for (const r of rows || []) {
     const n = (r.lines || 1) + (r.sub ? 0.8 : 0);
-    if (out.length >= max || used + n > budget) break;
+    if (out.length >= max || used + n > budget + 1e-9) break;   // 1e-9: 3 + 5 × 1.8 must still fit in 12
     used += n;
     out.push(r);
   }
@@ -314,14 +314,14 @@ function renderAccessory(w, fam, m) {
 async function runWidget() {
   const name = WIDGET.name.join('');
   let m = null;
-  try { m = await widgetModel(args.widgetParameter || ''); }
+  try { m = await widgetModel(args.widgetParameter || '', config.widgetFamily || 'medium'); }
   catch (e) { console.error('Widget model: ' + e); }
   if (!m) m = { empty: WIDGET.words.nothing };
-  if (m.at && !m.empty && Date.now() - m.at > cfg('widgetStaleMin') * 60e3) {
-    m.stale = true;
-    m.footer = WIDGET.words.updated + ' ' + wWhen(m.at);
-  }
   try {
+    if (m.at && !m.empty && Date.now() - m.at > cfg('widgetStaleMin') * 60e3) {
+      m.stale = true;
+      m.footer = WIDGET.words.updated + ' ' + wWhen(m.at);
+    }
     await renderWidget(m);
   } catch (e) {
     console.error('Widget render: ' + e);
@@ -341,11 +341,12 @@ Rules:
 
 - Keep the names. `wColor`, `wText`, `wFit` and the rest are shared so a fix in one app can be copied to all of them.
 - `REPO_RAW`, `APP_ID`, `VERSION` and `cfg` come from the in-app updates and settings blueprints.
+- `widgetRefreshMin` and `widgetStaleMin` must be in `CONFIG` (Step 6): `cfg()` throws on an unknown key, and the widget would always show the plain fallback.
 - The logo is the PNG from the repository, not a redrawing: Scriptable widgets can't render SVG, and the PNG is the exact app icon. It's cached as `<APP_ID>-widget-icon-<VERSION>.png`, so a new icon arrives with the next app version. Until the first fetch works, the widget shows a monogram tile.
 
 ## Step 3: the widget model
 
-`widgetModel(param)` is the one function each app writes. It reads the app's data (the snapshot from Step 5, or its own files) and returns a plain object. `param` is the widget's Parameter field (long-press the widget › Edit Widget), `''` when empty.
+`widgetModel(param, family)` is the one function each app writes. It reads the app's data (the snapshot from Step 5, or its own files, read only) and returns a plain object. `param` is the widget's Parameter field (long-press the widget › Edit Widget), `''` when empty; a parameter that matches nothing shows the app's normal content. `family` is `small`, `medium`, `large` or an `accessory…` kind, for content that differs by size ("large adds…" in Step 7); put the rows that must show first, because rows that don't fit are left out.
 
 | Field | Type | Shown as |
 | --- | --- | --- |
@@ -359,12 +360,14 @@ Rules:
 | `caption` | string | Under the value or title |
 | `rows` | array of `{ icon, text, sub, tone, lines, url }` | Rows; `icon` is one emoji or symbol, `lines` lets a row wrap (up to 3), `url` makes it tappable |
 | `footer` | string | Bottom line |
-| `at` | ms timestamp | When the data was true; drives the stale footer |
+| `at` | ms timestamp | When the data was true; drives the stale footer. Leave it out when the data only changes inside the app, which saves the snapshot every time (Go2FGym, VisionX): it can't go out of date |
 | `url` | string | Where a tap on the widget goes; default opens the app |
 | `empty` | string | Replaces hero, rows and footer with one sentence saying what to do |
 | `accessory` | `{ inline, glyph, value }` | Lock Screen overrides; without them the hero is used |
 
 Tones: `ink`, `soft`, `muted`, `accent`, `good` (teal), `warn` (amber), or a hex colour. Use tones, not colours, so the family stays consistent.
+
+AI-written text in a widget is marked with the `✦` icon on its row; there is no room for "✦ AI … by <Provider>", which the app itself shows. A widget never makes an AI request: it shows text the app already saved.
 
 Return `null` to get the generic empty state. Throwing is safe too, but log nothing private.
 
@@ -383,7 +386,11 @@ if (config.runsInWidget || config.runsInAccessoryWidget) {
 Script.complete();
 ```
 
-An app whose start-up runs at the top level of the script (Reading Stars builds its WebView there) first moves that code into `async function main()`, so nothing outside the two branches runs in a widget.
+- `loadSettings()` stands for the app's own settings load, with whatever it needs (Reading Stars passes its data, BlogPulse loads at the top of the script). It must run before both branches.
+- An app whose start-up runs at the top level of the script (Reading Stars and BlogPulse built their WebView there) first moves that code into `async function main()`, so nothing outside the two branches runs in a widget.
+- Start-up code that writes files, such as key migrations (`aiMigrate`), moves into the app branch: a widget run writes nothing but its own snapshot and icon.
+- A Shortcuts branch (StravaFeed's `refresh`) comes after the widget branch, as another `else if`.
+- The app branch also covers Shortcuts runs that open the app's code; `widgetIcon()` there is harmless.
 
 ## Step 5: saving the snapshot
 
@@ -395,11 +402,13 @@ The app calls `saveWidget(data)` whenever what the widget shows changes, with on
 | After the user changes something the widget shows | Go2FGym after a workout is saved; Reading Stars after a round or a payout |
 | On state that lives in the page | The page sends it through the bridge action `widget`, on the action allow-list; the Scriptable side keeps only the allowed fields and calls `saveWidget` |
 
-An app may also refresh inside `widgetModel()` (BlogPulse scans blogs, Dienynas+ asks TAMO) if it stays within its own time-budget tunable and falls back to the snapshot when the budget runs out. Most apps shouldn't: iOS gives a widget run little time and memory.
+An app may also refresh inside `widgetModel()` (BlogPulse scans blogs, Dienynas+ asks TAMO) if it stays within its own time-budget tunable and falls back to the snapshot when the budget runs out. Scriptable has no `setTimeout`: race the refresh against a `Timer.schedule` promise. What the refresh fetched stays in memory; the widget may write only its own snapshot with `saveWidget`, never the app's data files. Most apps shouldn't refresh at all: iOS gives a widget run little time and memory.
+
+If the page already sends its whole state to the Scriptable side (Reading Stars' `save`), build the snapshot there instead of adding a `widget` action. If an older version kept its widget data elsewhere (StravaFeed's in iCloud), the app removes the old file the first time it saves the new snapshot; until the app is opened once after the update, the widget may read the app's own local files read only, or show the empty state.
 
 ## Step 6: Settings
 
-Add the group "Widget" to `CONFIG`, or extend the app's existing one. Keep an existing key and its default; only add what is missing.
+Add the group "Widget" to `CONFIG`, or extend the app's existing one. It is required (the frame reads both keys). Keep an existing key and its default and range; only add what is missing. An app played or used once a day may raise its `widgetStaleMin` default (1440) so the footer isn't amber every morning.
 
 ```javascript
   ["Widget", [
@@ -425,13 +434,14 @@ Parameters: Reading Stars takes a player's name and shows that player only, with
 
 Privacy per app: Reading Stars never shows money, budgets or the PIN (kids see the Home Screen); Dienynas+ shows no grades or message text; VisionX shows no photos.
 
-Lock Screen: StravaFeed `{ glyph: '👍', inline: '👍 15 waiting for kudos' }`, Reading Stars `{ glyph: '⭐', inline: '⭐ Ema leads with 120' }`; the others use the defaults from the hero.
+Lock Screen: StravaFeed `{ glyph: '👍', inline: '👍 15 waiting for kudos' }`, Reading Stars `{ glyph: '⭐', inline: '⭐ Ema leads with 120', value: 120 }`, VisionX `{ glyph: '●', value: <photos> }`. The circular kind shows `–` when the hero is a title and there is no `accessory.value`, so give apps with a title hero a number there (unread posts, workouts this week).
 
 ### Example: VisionX
 
 ```javascript
-// VisionX: the session running now, else the last saved one. The page saves the live state
-// through the bridge action "widget" when a session starts, after each photo and when it stops.
+// The session running now, else the last saved one. The page saves the live state through the
+// bridge action "widget" when a session starts, after each photo and when it stops.
+// Read only: sesIndex(), never sessionList(), which deletes files. No photo ever reaches the widget.
 async function widgetModel() {
   const live = readWidget();
   if (live && live.running && Date.now() - live.at < 10 * 60e3) {
@@ -439,19 +449,23 @@ async function widgetModel() {
       caption: live.photos + (live.photos === 1 ? ' photo' : ' photos') + ' so far', footer: 'Started ' + wWhen(live.startedAt),
       accessory: { glyph: '●', value: live.photos } };
   }
-  const last = sesIndex().sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0))[0];
+  const last = sesIndex().filter((m) => m && m.endedAt).sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0))[0];
   if (!last) return { empty: 'No sessions yet. Tap to start one.' };
   const mins = Math.round((Date.now() - last.endedAt) / 60e3);
   const ago = mins < 60 ? mins + ' min ago' : mins < 1440 ? Math.round(mins / 60) + ' h ago' : wWhen(last.endedAt);
+  const ran = (last.ran || []).map((t) => ({ icon: '⚡', text: t.name, sub: t.fired + (t.fired === 1 ? ' run' : ' runs') }));
   return {
     kicker: 'Last session · ' + ago,
     title: last.preset || 'Session',
-    caption: last.photos + ' photos' + (last.fired ? ', ' + last.fired + (last.fired === 1 ? ' trigger run' : ' trigger runs') : ''),
-    rows: last.summary ? [{ text: last.summary, lines: 3 }] : [],
+    caption: last.photos + (last.photos === 1 ? ' photo' : ' photos') + (last.fired ? ', ' + last.fired + (last.fired === 1 ? ' trigger run' : ' trigger runs') : ''),
+    rows: ran.concat(last.summary ? [{ icon: '✦', text: last.summary, lines: 3 }] : []),
     footer: last.engine,
+    accessory: { glyph: '◉', value: last.photos },
   };
 }
 ```
+
+The page side sends the live state with `nativeCall("widget", …)`; the bridge keeps only `running`, `preset`, `interval`, `photos` and `startedAt` and calls `saveWidget`. Each saved session's index entry carries `ran`, the shortcuts that ran (3 at most), for the rows.
 
 `sesIndex()` only reads; don't call `sessionList()` from a widget, because it deletes files.
 
@@ -503,4 +517,4 @@ Add the shared widget to [App], following the blueprint "widgets" (github.com/ga
 
 | Version | Date | Changes |
 | --- | --- | --- |
-| 1.0.0 | 2026-10-29 | First version, draft until VisionX 1.19.0 ships it |
+| 1.0.0 | 2026-10-29 | First version, shipped by VisionX 1.19.0 and then the other five apps. Before tagging: `wFit` tolerates rounding (3 + 5 × 1.8 fits in 12), the stale check runs inside the renderer's `try`, `widgetModel` also gets the widget family, and Steps 3–7 cover language getters, migrations, Shortcuts branches, refreshes that only write the snapshot, and Lock Screen values |
