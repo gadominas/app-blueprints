@@ -1,8 +1,8 @@
 ---
 id: settings
 title: Settings for Scriptable apps
-version: 1.0.0
-updated: 2026-10-28
+version: 1.1.0
+updated: 2026-10-30
 author: Gediminas Siutilas
 reference: BlogPulse 1.1.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
 depends_on: []
@@ -290,8 +290,9 @@ const SETTINGS_SVG = `<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 
 | Sheet | Full screen, slides up in 0.28 s (`transform: translateY(102%)` → none), `--paper` background, scrolls on its own; the page behind is locked |
 | Header | Sticky. "Settings" in the display font, 24 × `--ts`, bold, left; **Done** in the accent colour, right. Top padding includes the safe area |
 | Hint | "Changes apply right away and are kept on this iPhone." in muted 13 × `--ts` |
-| Section title | Display font, 17 × `--ts`, bold, 26 above |
-| Switch row | Label (semibold) and one muted line under it, switch right (46 × 28, accent when on); divider under the row |
+| Section heading | Small and quiet so it reads as a heading, not a row: 12.5 × `--ts`, bold, uppercase, letter-spaced, `--muted`, 28 above the card and 8 between heading and card |
+| Section card | Every section's rows sit in one card: `--sheet` fill (lighter than the page in dark palettes, white on light ones), a 1 px `--rule` border, 16 radius, 16 side padding. The card's top and bottom edges are where the section starts and ends; rows inside are divided by hairlines and the last row has none. A section's explanation (Built with) and the changed-count footer sit outside the card |
+| Switch row | Label (semibold) and one muted line under it, switch right (46 × 28, accent when on); divider under the row unless it is the card's last |
 | Segmented control | Full width, equal buttons, the selected one in `--ink` on `--paper` |
 | Swatches | A row of 50 × 50 previews with the name under each; the selected one outlined in the accent; scrolls sideways if needed |
 | Tunable | Label with **Reset** on the right when changed, a dot after the label when changed, help line; then − field + unit, with "5–60 — original 15" under it. Text and list tunables get a full-width field instead |
@@ -332,13 +333,15 @@ function renderCfg() {
   const changed = Object.keys(S.cfg).filter(cfgChanged).length;
   el.innerHTML = `<div class="sh-head"><h2>Settings</h2><button class="link" data-act="cfgclose">Done</button></div><div class="sh-body">
     <p class="hint">Changes apply right away and are kept on this iPhone.</p>
-    <h3 class="sec">Appearance</h3>${lookHTML()}
-    <h3 class="sec">Reading</h3>
+    <h3 class="sec">Appearance</h3><div class="grp">${lookHTML()}</div>
+    <h3 class="sec">Reading</h3><div class="grp">
     <div class="srow"><div class="grow"><b>Mark as read when opened</b><small class="muted">Off: you mark posts read yourself</small></div><button class="switch ${S.settings.readOnOpen ? "on" : ""}" data-act="toggle" data-v="readOnOpen" aria-label="Mark as read when opened"></button></div>
-    <h3 class="sec">Updates</h3>
+    </div>
+    <h3 class="sec">Updates</h3><div class="grp">
     <div class="srow"><div class="grow"><b>Offer new versions</b><small class="muted">You have BlogPulse ${esc(S.version)}. “Later” waits two days.</small></div><button class="switch ${S.settings.checkUpdates ? "on" : ""}" data-act="toggle" data-v="checkUpdates" aria-label="Offer new versions"></button></div>
     <div class="srow"><div class="grow"><b>Check for updates now</b><small id="updmsg" class="muted" aria-live="polite"></small></div><button class="sm" data-act="updcheck">Check</button></div>
-    ${S.cfgSchema.map(sec => `<h3 class="sec">${esc(sec.title)}</h3>${sec.items.map(field).join("")}`).join("")}
+    </div>
+    ${S.cfgSchema.map(sec => `<h3 class="sec">${esc(sec.title)}</h3><div class="grp">${sec.items.map(field).join("")}</div>`).join("")}
     <div class="aic-btns cfg-foot"><span class="note">${changed ? changed + " setting" + (changed === 1 ? "" : "s") + " changed" : "All settings are at their original values"}</span>
       ${changed ? `<button class="sm danger ${cfgArmed ? "armed" : ""}" data-act="cfgall">${cfgArmed ? "Confirm reset" : "Reset all"}</button>` : ""}</div>
   </div>`;
@@ -369,6 +372,8 @@ document.addEventListener("change", e => {
 });
 ```
 
+Every section is a heading followed by one `<div class="grp">` holding all of its rows: never put a row outside a card, and never put two sections in one card.
+
 The page code above is modern JavaScript because BlogPulse's page is a real function serialised with `toString()`. If an app builds its page inside a template string, write the same logic in ES5 without backticks or `${`.
 
 ### CSS
@@ -387,7 +392,10 @@ body.locked{overflow:hidden}
 .link{color:var(--signal);font-weight:600;font-size:16px}
 .link.small{font-size:calc(14px * var(--ts))}
 .hint{font-size:calc(13px * var(--ts));color:var(--muted);margin:8px 2px 0}
-.sec{font:700 calc(17px * var(--ts))/1.2 var(--display);margin:26px 0 6px}
+.sec{font:700 calc(12.5px * var(--ts))/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:28px 4px 8px}
+.grp{background:var(--sheet);border:1px solid var(--rule);border-radius:16px;padding:0 16px;overflow:hidden}
+.grp>.srow:last-child,.grp>.cfg:last-child,.grp>.lk-row:last-child{border-bottom:0}
+.grp .lk-row{margin:0;padding:12px 0;border-bottom:1px solid var(--rule)}
 .srow{display:flex;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid var(--rule)}
 .grow{flex:1;min-width:0}
 .grow b{display:block;font-weight:600}
@@ -426,7 +434,8 @@ body.locked{overflow:hidden}
 .stepper .range{flex-basis:100%;font-size:calc(12px * var(--ts));color:var(--muted)}
 .cfgin.wide{display:block;width:100%;margin-top:8px;font:16px/1.45 var(--sans);padding:9px 11px;border-radius:9px;border:1px solid var(--rule);background:var(--paper);color:var(--ink)}
 .cfgin:focus{outline:2px solid var(--signal);outline-offset:-1px}
-.cfg-foot{margin-top:18px}
+.cfg-foot{margin:10px 4px 0}
+button.srow{width:100%;text-align:left}
 ```
 
 Input fields stay at 16px regardless of text size; anything smaller makes iOS zoom the page when the field is tapped.
@@ -524,10 +533,10 @@ const bpLink = b => `${S.blueprintsRepo}/blob/${b.id}-v${b.version}/blueprints/$
 function builtWithHTML() {
   return `<h3 class="sec">Built with</h3>
     <p class="hint">${esc(S.appName)} is built from shared blueprints that its other apps use too. Tap one to read how that part works.</p>
-    ${S.blueprints.map(b => `<button class="srow bp" data-act="openurl" data-v="${esc(bpLink(b))}">
+    <div class="grp">${S.blueprints.map(b => `<button class="srow bp" data-act="openurl" data-v="${esc(bpLink(b))}">
       <div class="grow"><b>${esc(b.name)}</b><small class="muted">Blueprint ${esc(b.version)} · since ${esc(S.appName)} ${esc(b.since)}</small></div><span class="chev" aria-hidden="true">›</span></button>`).join("")}
     <button class="srow bp" data-act="openurl" data-v="${esc(S.blueprintsRepo)}">
-      <div class="grow"><b>All blueprints</b><small class="muted">${esc(S.blueprintsRepo.replace("https://", ""))}</small></div><span class="chev" aria-hidden="true">›</span></button>`;
+      <div class="grow"><b>All blueprints</b><small class="muted">${esc(S.blueprintsRepo.replace("https://", ""))}</small></div><span class="chev" aria-hidden="true">›</span></button></div>`;
 }
 // in renderCfg(), last: …${builtWithHTML()}
 // In the page's click handler:
@@ -587,6 +596,7 @@ The words decide whether a user understands a setting without reading the code. 
 - [ ] Comfortable, Compact and Tiny each change spacing everywhere; Tiny lists stay tappable.
 - [ ] Larger text never truncates buttons or overlaps the header; input fields don't zoom the page when tapped.
 - [ ] Serif changes titles and headings only.
+- [ ] Every section is one card under a small muted uppercase heading; it is clear where each section starts and ends, in every palette (Contrast too, where the border does the work) and at Larger text; no card's last row has a divider.
 - [ ] Every change shows at once, and is still there after closing and reopening the app.
 - [ ] A typed tunable outside its range is clamped to the nearest limit; Reset brings back the original; Reset all needs two taps.
 - [ ] Changing a tunable with a side effect (Keep at most) applies it straight away.
@@ -597,6 +607,7 @@ The words decide whether a user understands a setting without reading the code. 
 
 ## Pitfalls
 
+- **Section headings that look like row labels.** A bold heading in the same colour and nearly the same size as the rows, with only hairlines between sections, makes it unclear where a section starts and ends (seen on Strava Daily Digest). Headings are small muted caps, and each section's rows sit in one card (`.grp`).
 - **Text symbols as icons.** ⚙︎ and ↻ draw at different sizes in the same font; use SVG line icons (learned on StravaFeed).
 - **Hardcoded colours.** One `#fff` in the CSS breaks the dark palettes. Every colour comes from a token; check all six palettes.
 - **Fixed font sizes.** A size written in plain `px` ignores Text size. Write every size as `calc(<px> * var(--ts))`, except form fields, which stay at 16px so iOS doesn't zoom.
@@ -628,3 +639,4 @@ Add the shared Settings sheet to [Go2FGym], following the attached doc "Settings
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-28 | First versioned release |
+| 1.1.0 | 2026-10-30 | Sections are cards: each section's rows sit in one `.grp` card (`--sheet` fill, `--rule` border, 16 radius) under a small muted uppercase heading (`.sec`), so it is clear where a section starts and ends. Built with is a card too. Not yet in the reference app |
