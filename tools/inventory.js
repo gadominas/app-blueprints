@@ -12,6 +12,17 @@ const args = new Set(process.argv.slice(2));
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i] ? 1 : -1; return 0; };
 
+// The commit a branch points to now, from the GitHub API (60 requests an hour without a token; set GITHUB_TOKEN for more).
+async function headSha(repo, branch) {
+  try {
+    const h = { Accept: 'application/vnd.github.sha', 'User-Agent': 'app-blueprints-inventory' };
+    if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    const r = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`, { headers: h });
+    const t = r.ok ? (await r.text()).trim() : '';
+    return /^[0-9a-f]{40}$/.test(t) ? t : null;
+  } catch (e) { return null; }
+}
+
 async function get(url) {
   // GitHub's raw cache can serve a copy minutes old; a unique query string always gets the current file.
   try { const r = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { headers: { 'Cache-Control': 'no-cache' } }); return r.ok ? await r.text() : null; }
@@ -68,8 +79,9 @@ function readDocs(md) {
   // 2. Apps: script trace vs docs vs latest versions.
   const apps = [];
   for (const app of CFG.apps) {
-    // The full ref name: GitHub's raw cache can keep resolving a short branch name to an old commit for many minutes.
-    const ref = `refs/heads/${app.branch}`;
+    // Read the branch's latest commit by its id: a commit's files never change, so no cache can serve them stale.
+    // (Caches were seen serving a branch's old files for minutes, even with refs/heads/… and a unique query.)
+    const ref = (await headSha(app.repo, app.branch)) || `refs/heads/${app.branch}`;
     const script = await get(RAW(app.repo, ref, app.script));
     const docs = readDocs(await get(RAW(app.repo, ref, 'docs/BLUEPRINTS.md')));
     const out = { app: app.name, repo: app.repo, version: null, rows: [], notes: [] };
