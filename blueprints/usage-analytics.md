@@ -1,7 +1,7 @@
 ---
 id: usage-analytics
 title: Anonymous usage analytics for Scriptable apps
-version: 1.0.0
+version: 1.1.0
 updated: 2026-10-31
 author: Gediminas Siutilas
 reference: StravaFeed 1.24.0 (https://github.com/gadominas/StravaFeed/blob/main/Strava%20Daily%20Digest.js)
@@ -21,13 +21,15 @@ What the user sees, in every app:
 - **Settings › Privacy › Test the connection**: **Send test** sends one event now and shows PostHog's own answer ("Last sent 18:42: 1 event, accepted (us.i.posthog.com)", or the error).
 - **Nothing else.** No banners, no slowdowns, no errors: if sending fails, those counts are simply dropped. The start-up log notes every send.
 
+**All apps share one PostHog project**, in the US cloud: host `https://us.i.posthog.com`, project key `phc_yAi2PxJCRioWEKLF3uockdCf3QvyQdNABivwqpE4NCWR`. Every app uses these two values as they are; the `app` property on every event tells the apps apart.
+
 What you see in PostHog: unique users per day, week and month (one per install), how often each feature is used, which app versions are in use, and the choices people make (layout, theme, AI on or off).
 
 The pieces, all inside the app's single script:
 
 | Piece | Lives in | Job |
 | --- | --- | --- |
-| `USAGE` | Top of the script, near `APP_ID` | PostHog host (the project's region) and project key; an empty key turns everything off |
+| `USAGE` | Top of the script, near `APP_ID` | The shared PostHog project: its host (US cloud) and project key; an empty key turns everything off |
 | `shareUsage`, `usageAsked` | `settings` (settings blueprint) | The person's choice, and whether they were asked |
 | `installId`, `track`, `postUsage`, `flushUsage`, `usageStatus`, `setUsage` | Scriptable side | Random install ID, queue, sending, status line, switching on and off |
 | `track('…')` calls | Scriptable side, where things happen | One line per event, counts only |
@@ -47,7 +49,7 @@ Reference implementation: [Strava Daily Digest.js](https://github.com/gadominas/
 | Anonymous | Every event has `$process_person_profile: false` (no person profiles, PostHog's cheapest kind) and a random `distinct_id` made on the phone, not linked to any account. |
 | Off deletes the ID | Turning sharing off empties the queue and deletes the install ID from the Keychain; turning it on again makes a new one. |
 | Counts, never content | Event properties are app version, small numbers, booleans and fixed choices (layout, theme, mood, language). Never names, account or athlete IDs, free text, titles, descriptions, URLs, photos, locations, or anything the app read from a service. |
-| The project's own region | `USAGE.HOST` is the region the PostHog project was created in (`https://us.i.posthog.com` or `https://eu.i.posthog.com`). The other region answers "accepted" and then drops the events, so there is no automatic fallback. |
+| The project's own region | `USAGE.HOST` is the region the PostHog project lives in. For the shared project that is the US cloud, `https://us.i.posthog.com`; the EU address answers "accepted" for its key and then drops the events, so there is no automatic fallback. |
 | Never in the way | Events are queued and sent together 3 s after the first one, at 25 events, and when the window closes. A failed send is logged and dropped; nothing retries, waits or shows an error. |
 | App only | Track only where the app's page is presented. Never from the widget, a Shortcut or a background run. |
 | Said in the README | The app's README privacy section names the service, the region and the events (Step 8). |
@@ -61,12 +63,19 @@ The state lives in `settings.json` (settings blueprint), with no UI beyond the P
 
 ## Step 0: the PostHog project
 
-Done once, by the app's owner, before the key goes into any app.
+There is one, shared by every app, so nothing needs creating:
 
-1. Sign up at [posthog.com](https://posthog.com) and **note the region** the project is created in: the address bar says `us.posthog.com` or `eu.posthog.com`. The EU cloud keeps the data in Europe; pick it at sign-up if that matters (the default sign-up is US).
-2. Copy the **Project API key** (starts with `phc_`) from **Settings → Project → General**. It is made to sit in public apps and can only add events. Never use a personal API key (`phx_`).
-3. Optional: in the project settings, turn on **Discard client IP data**.
-4. One project can serve every app: events carry `app`, so filter or break down by it. Use separate projects only if you want separate free allowances.
+| | Value |
+| --- | --- |
+| Region | US cloud (the dashboard is at `us.posthog.com`) |
+| Host | `https://us.i.posthog.com` |
+| Project key | `phc_yAi2PxJCRioWEKLF3uockdCf3QvyQdNABivwqpE4NCWR` |
+
+The key is PostHog's **project** key (it starts with `phc_`): it is made to sit in public apps and can only add events, so it goes in the script as it is. Never put a **personal** key (`phx_…`) in an app.
+
+Because every app sends to the same project, every event carries `app: APP_ID` (Step 2): filter or break down by it to see one app, or leave it to see all of them. The free allowance (1 million events a month) is shared by all the apps.
+
+Only if an app ever needs its own project: create it at [posthog.com](https://posthog.com), note the region in the address bar (`us.posthog.com` or `eu.posthog.com`), copy its project key from **Settings → Project → General**, and set both in `USAGE`; optionally turn on **Discard client IP data**.
 
 ## Step 1: constants and settings
 
@@ -79,7 +88,7 @@ Next to `APP_ID` and `VERSION`:
 // other services, text, photos or anything the app read. Events are anonymous (no person profiles).
 // The key is PostHog's project key, made to sit in public apps: it can only add events.
 // HOST must be the region the project lives in: PostHog's other region answers "accepted" and then drops the events.
-const USAGE = { HOST: 'https://us.i.posthog.com', KEY: '' };
+const USAGE = { HOST: 'https://us.i.posthog.com', KEY: 'phc_yAi2PxJCRioWEKLF3uockdCf3QvyQdNABivwqpE4NCWR' };   // the shared project (Step 0)
 const KC_INSTALL = 'myapp-install-id';
 ```
 
@@ -271,16 +280,16 @@ On settings 1.1.0, put the two rows in the section's card (`.grp`) like every ot
 
 ## Step 7: verify in PostHog
 
-1. Update the app on the phone, tap **Yes, share** (or turn the switch on), then **Send test**: the line must say "accepted (<host>)".
-2. In PostHog (the project's region), open **Activity**: `usage_opt_in`, `usage_test` and `app_open` appear within a minute. **Persons** stays empty by design.
-3. Create an insight: **Trends** → event `app_open` → **Unique users**, daily and weekly, broken down by `app_version` (and by `app` when one project serves several apps). Save it to a dashboard.
+1. Update the app on the phone, tap **Yes, share** (or turn the switch on), then **Send test**: the line must say "accepted (us.i.posthog.com)".
+2. In PostHog at **us.posthog.com**, open **Activity** and filter by `app` = the app's `APP_ID`: `usage_opt_in`, `usage_test` and `app_open` appear within a minute. **Persons** stays empty by design.
+3. Create an insight: **Trends** → event `app_open` → **Unique users**, daily and weekly, broken down by `app` (one line per app) or, filtered to one app, by `app_version`. Save it to the shared dashboard.
 
 ## Step 8: the README
 
 Change "nothing is collected" wording in the app's privacy section, and add:
 
 ```markdown
-- **Anonymous usage, only if you agree.** A one-time question (and **Settings › Privacy › Share anonymous usage**) decides whether the app sends anonymous counts to PostHog's <US|EU> cloud: <the app's events in plain words>, the app version and a few display settings. Each event carries a random install ID made on your phone, not linked to <service>. Never sent: <names, IDs, text, photos, anything from the service>. Turning it off stops sending and deletes the install ID.
+- **Anonymous usage, only if you agree.** A one-time question (and **Settings › Privacy › Share anonymous usage**) decides whether the app sends anonymous counts to PostHog's US cloud: <the app's events in plain words>, the app version and a few display settings. Each event carries a random install ID made on your phone, not linked to <service>. Never sent: <names, IDs, text, photos, anything from the service>. Turning it off stops sending and deletes the install ID.
 ```
 
 ## Testing checklist
@@ -291,7 +300,7 @@ Run these on a phone, in light and dark mode.
 - [ ] With a key: the card appears once on the main page; **No thanks** hides it for good and nothing is sent
 - [ ] **Yes, share**: a toast thanks you; within 3 s the start-up log shows `usage: … sent to <host>`
 - [ ] **Settings › Privacy › Send test** says "✓ Last sent …: 1 event, accepted (<host>)"
-- [ ] PostHog's **Activity** shows `usage_opt_in`, `usage_test` and `app_open` within a minute, in the right project and region
+- [ ] PostHog's **Activity** at us.posthog.com, filtered to `app` = this app's `APP_ID`, shows `usage_opt_in`, `usage_test` and `app_open` within a minute
 - [ ] Each of the app's own events appears after its action succeeds, and not after one that fails
 - [ ] No event property holds a name, ID, text, URL or photo (open a few in **Activity** and read them)
 - [ ] Opening and closing the app quickly still delivers `app_open` (sent on close)
@@ -302,7 +311,8 @@ Run these on a phone, in light and dark mode.
 
 ## Pitfalls
 
-- **The wrong region swallows everything** (hit in StravaFeed). PostHog's EU address answered HTTP 200 "accepted" for a key whose project lived in the US cloud, then dropped every event: the phone said sent, PostHog showed nothing. The docs say a 200 means the key is valid; in practice it doesn't. Set `USAGE.HOST` from the address bar of the PostHog project (Step 0), and don't add an automatic fallback: StravaFeed 1.23.1 tried the other region only on a refusal, never got one, and remembered the wrong region.
+- **The wrong region swallows everything** (hit in StravaFeed). PostHog's EU address answered HTTP 200 "accepted" for the shared project's key, whose project lives in the US cloud, then dropped every event: the phone said sent, PostHog showed nothing. The docs say a 200 means the key is valid; in practice it doesn't. Keep `USAGE.HOST` at `https://us.i.posthog.com` for the shared key, and don't add an automatic fallback: StravaFeed 1.23.1 tried the other region only on a refusal, never got one, and remembered the wrong region.
+- **Forgetting `app`.** All apps share one project; an event without `app` can't be told apart. `track` adds it to every event, so never build events by hand.
 - **A refusal that looks like success** (hit in StravaFeed). `Request.loadString()` doesn't throw on 4xx or 5xx. Reading `r.response.statusCode`, logging every send and the **Send test** row are what made the region problem visible at all.
 - **Events lost on a quick close** (hit in StravaFeed). With an 8 s delay, opening and closing the app in a few seconds lost `app_open`. Send after 3 s and again when the window closes.
 - **Escaped twice** (hit in StravaFeed). The page's code lives inside a template string: no backticks or `${` in it, and a regex like `\s` needs `\\s`. The card above is built on the Scriptable side on purpose.
@@ -319,7 +329,7 @@ Add anonymous usage analytics to [App], following the attached doc "Anonymous us
 
 - Repository: github.com/gadominas/[App], branch main, script file [App.js]
 - The app already follows settings and in-app updates (apply those first if not)
-- PostHog: region [US|EU], project key [phc_… or "leave empty for now"]
+- PostHog: the shared project from Step 0 (US cloud, key as in the doc); APP_ID [myapp] goes on every event as `app`
 - Install-ID Keychain name: [myapp-install-id]
 - The app's own events: [list the 4–8 features to count, each with its fixed-choice properties]; show me the event catalog before writing code
 - The one line on the question card: what is shared, in this app's words, and what is never shared
@@ -333,3 +343,4 @@ Add anonymous usage analytics to [App], following the attached doc "Anonymous us
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-31 | First versioned release, from StravaFeed 1.23.0–1.24.0; adds `app: APP_ID` and `$lib: APP_ID` to every event so one PostHog project can serve several apps |
+| 1.1.0 | 2026-10-31 | One shared PostHog project for every app (US cloud, its project key in Step 0 and Step 1); checks in PostHog filter by `app`; new pitfall: forgetting `app`. Apps on 1.0.0 with their own project still conform |
