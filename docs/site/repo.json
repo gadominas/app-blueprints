@@ -1,0 +1,5 @@
+{
+  "description": "Shared, versioned blueprints for my single-file Scriptable apps (in-app updates, settings, AI configuration, launch screen, widgets), plus the tools that rebuild every app's repository page. Written for people and coding agents.",
+  "homepage": "https://github.com/gadominas/app-blueprints#readme",
+  "topics": ["scriptable", "scriptable-app", "ios", "iphone", "javascript", "app-blueprints", "blueprints", "design-system", "coding-agents", "claude-code", "playwright", "screenshots"]
+}

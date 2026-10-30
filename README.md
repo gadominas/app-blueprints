@@ -58,10 +58,18 @@ app-blueprints/
 ├── templates/
 │   ├── blueprint-template.md ← skeleton for writing a new blueprint
 │   └── recipe-template.md    ← skeleton for writing a new recipe
-└── tools/
-    ├── inventory.js          ← which app follows which blueprint version
-    └── apps.json             ← the apps the inventory checks
+├── tools/
+│   ├── inventory.js          ← which app follows which blueprint version
+│   └── apps.json             ← the apps the inventory checks
+└── repo-site/                ← NOT a blueprint: how each app's GitHub page is rebuilt
+    ├── REBUILD.md            ← the instructions (README, screenshot cards, badges, About box)
+    ├── TEMPLATE.md           ← the README skeleton every app repository uses
+    └── tools/                ← Scriptable emulator, capture, card composer, README check, About
 ```
+
+## Repository sites (separate from the blueprints)
+
+The blueprints decide how the apps behave. How their GitHub repositories look is kept apart, in [`repo-site/`](repo-site): one README layout, the same badges and About box, and numbered, labelled screenshot cards that are regenerated from each app's real script in a Scriptable emulator. To rebuild an app's page, follow [`repo-site/REBUILD.md`](repo-site/REBUILD.md); it never changes an app's code or version.
 
 ## How to use it
 

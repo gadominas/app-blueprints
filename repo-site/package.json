@@ -1,0 +1,11 @@
+{
+  "name": "repo-site",
+  "private": true,
+  "description": "Regenerates the app repositories' screenshot cards. See REBUILD.md.",
+  "scripts": {
+    "capture": "node tools/capture.js"
+  },
+  "dependencies": {
+    "sharp": "0.34.4"
+  }
+}

@@ -244,3 +244,7 @@ End every blueprint task with:
 - deviations and why,
 - the blueprint testing checklist to run on the phone,
 - commit links, and the new version users will be offered.
+
+## 9. Not covered here: repository sites
+
+Rebuilding an app's README, screenshots, badges or GitHub About box is a separate task with its own instructions: [`repo-site/REBUILD.md`](repo-site/REBUILD.md). It is not a blueprint, has no version or trace, and must not change an app's script, `VERSION` or `releases.json`.
