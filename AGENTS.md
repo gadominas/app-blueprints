@@ -13,10 +13,11 @@ Read this whole file before changing any code.
 | `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
 | `launch-screen` | Launch screen | 1.0.0 | [blueprints/launch-screen.md](blueprints/launch-screen.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/launch-screen.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.17.1) | — |
 | `widgets` | Widgets | 1.0.0 | [blueprints/widgets.md](blueprints/widgets.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/widgets.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.19.0) | `settings`, `launch-screen` |
+| `ai-invitation` | AI invitation | 1.0.0 | [blueprints/ai-invitation.md](blueprints/ai-invitation.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-invitation.md | None yet (the first app to adopt it) | `ai-configuration`, `in-app-updates`, `settings` |
 
 A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
-When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`, `widgets`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, then the launch screen, which touches nothing else, and last the widget, which takes its tunables from Settings and its name and accent from the launch screen.
+When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`, `widgets`, `ai-invitation`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, then the launch screen, which touches nothing else, then the widget, which takes its tunables from Settings and its name and accent from the launch screen, and last the AI invitation, which waits for the launch screen and the update offer and leads into the AI settings sheet. Apps without AI features skip `ai-configuration` and `ai-invitation`.
 
 **Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
 
@@ -196,6 +197,7 @@ An app carries its trace in three places, which must always agree:
 - Every AI request goes through `aiCall` with a user-facing feature tag; usage is saved after every request.
 - OpenAI requests omit `max_tokens`; Claude requests include it.
 - Without a key, AI-only features are hidden (not disabled), fallbacks are labelled “no AI”, and every hint points to **Settings › AI settings**.
+- The AI invitation never appears when a key exists or ever existed, on the first day, more than once every 3 days, on a launch that offers an update, over another sheet, or outside the app's page; **Don't remind me again** ends it for good.
 
 **Start-up (recipe `safe-startup`)**
 - Only settings are read before the window; every other data file is read in `loadData()` after an empty window in the app's ground colour is on screen, and the real page is built inside that visible window.
