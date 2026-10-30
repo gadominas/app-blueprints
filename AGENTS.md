@@ -13,7 +13,7 @@ Read this whole file before changing any code.
 | `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
 | `launch-screen` | Launch screen | 1.0.0 | [blueprints/launch-screen.md](blueprints/launch-screen.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/launch-screen.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.17.1) | — |
 | `widgets` | Widgets | 1.0.0 | [blueprints/widgets.md](blueprints/widgets.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/widgets.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.19.0) | `settings`, `launch-screen` |
-| `ai-invitation` | AI invitation | 1.2.0 | [blueprints/ai-invitation.md](blueprints/ai-invitation.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-invitation.md | https://github.com/gadominas/Stockit/blob/main/Stockit.js (v1.13.2) | `ai-configuration`, `in-app-updates`, `settings` |
+| `ai-invitation` | AI invitation | 1.2.1 | [blueprints/ai-invitation.md](blueprints/ai-invitation.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-invitation.md | https://github.com/gadominas/Stockit/blob/main/Stockit.js (v1.13.3) | `ai-configuration`, `in-app-updates`, `settings` |
 
 A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
@@ -27,7 +27,7 @@ A **recipe** is a set of coding rules that fixes a class of bug once, the same w
 
 | Id | Name | Version | File | Prevents | Reference implementations |
 | --- | --- | --- | --- | --- | --- |
-| `safe-startup` | Safe start-up | 1.0.0 | [recipes/safe-startup.md](recipes/safe-startup.md) | Blank or black screen on open, especially from the widget, after quick taps, or with slow iCloud; data overwritten after a failed read | BlogPulse 1.9.2, Stockit 1.4.1 |
+| `safe-startup` | Safe start-up | 1.1.0 | [recipes/safe-startup.md](recipes/safe-startup.md) | Blank or black screen on open, especially from the widget, after quick taps, or with slow iCloud; data overwritten after a failed read; a damaged file blocking every later save | BlogPulse 1.12.0, Stockit 1.13.3 |
 
 Apply the recipes:
 
@@ -201,7 +201,7 @@ An app carries its trace in three places, which must always agree:
 
 **Start-up (recipe `safe-startup`)**
 - Only settings are read before the window; every other data file is read in `loadData()` after an empty window in the app's ground colour is on screen, and the real page is built inside that visible window.
-- Every iCloud read has a time limit; a data file that wasn't read is never written.
+- Every iCloud read has a time limit; a data file that didn't arrive is never written; a file that arrived damaged is copied aside (`<name>.broken-<time>.json`) and then saved normally.
 - The page boots from data it's handed (`window.__parts`, `window.__boot`); `buildHTML()` never inlines `clientState()`; every `evaluateJavaScript` at start-up has a time limit.
 - One window at a time (lock in the local temporary directory, wait at most 1.5 s, never refuse to open).
 - The app's own refresh, the update check and the widget icon start after the first screen (0.7 s, 3.5 s, 6 s).

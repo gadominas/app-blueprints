@@ -1,10 +1,10 @@
 ---
 id: ai-invitation
 title: AI invitation for Scriptable apps
-version: 1.2.0
+version: 1.2.1
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: Stockit 1.13.2 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
+reference: Stockit 1.13.3 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
 depends_on: [ai-configuration, in-app-updates, settings]
 ---
 
@@ -35,7 +35,7 @@ The pieces, all inside the app's single script:
 
 **An invitation, not a nag: whether a key exists is the only test of whether AI is on; at most one every 3 days, never on top of anything, and one tap ends it for good.**
 
-Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob/main/Stockit.js) (search for `aiInvite`). The code below is the same code, with names kept, so the two can be compared line by line; Stockit reaches the page with `call("__aiInvite", AI_INVITE)`, its name for `js()`.
+Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob/main/Stockit.js) 1.13.3 (search for `aiInvite`). The code below is the same code, with names kept, so the two can be compared line by line; Stockit reaches the page with `call("__aiInvite", AI_INVITE)`, its name for `js()`.
 
 ## The rules
 
@@ -195,7 +195,9 @@ function closeInvite(what) {
   send("aiinvite", { v: what });
   if (what === "open") setTimeout(function () {
     window.__aiOpen();   // the same thing the Settings row's "aiopen" action does
-    var add = document.querySelector('#aisheet [data-act="aikey"]');   // the provider in use comes first
+    // The Add key of the provider in use: its card is the one marked .active (never "the first button", which
+    // is the wrong provider in any app whose sheet doesn't put the provider in use first).
+    var add = document.querySelector('#aisheet .aicard.active [data-act="aikey"]') || document.querySelector('#aisheet [data-act="aikey"]');
     if (add) { add.classList.add("aiinv-nudge"); if (add.scrollIntoView) add.scrollIntoView({ block: "center" }); setTimeout(function () { add.classList.remove("aiinv-nudge"); }, 2600); }
   }, 280);
 }
@@ -265,7 +267,7 @@ Run these on a phone, in light and dark mode, with and without Reduce Motion.
 - [ ] First launch without a key (delete `settings.json` to simulate a fresh install): the card appears as soon as the launch screen has gone.
 - [ ] The card springs up, the perks slide in one by one, the ✦ twinkles, **Turn on AI** glows twice; nothing moves with Reduce Motion on.
 - [ ] Title and perks fit without overflow at **Larger** text, on the smallest supported phone.
-- [ ] **Turn on AI**: the card closes, AI settings slides up, **Add key** pulses; with a key saved, no invitation on the next launches.
+- [ ] **Turn on AI**: the card closes, AI settings slides up, **Add key** pulses on the card marked **In use** (try it with OpenAI in use too); with a key saved, no invitation on the next launches.
 - [ ] **Later**, and a tap on the dimmed backdrop: the card closes; it doesn't return on the next launch the same day.
 - [ ] **Don't remind me again**: it never returns, however long you wait.
 - [ ] With an update available (bump `VERSION` down), only the update sheet appears that launch.
@@ -283,6 +285,7 @@ Run these on a phone, in light and dark mode, with and without Reduce Motion.
 - **Counting invitations the user never saw.** If `shown` is recorded when the Scriptable side asks rather than when the page shows the card, a busy launch eats an invitation. Only the page sends `shown`.
 - **Two offers on one launch.** Calling `inviteIfDue` straight after the first render races the update check; chain it after the check settles, as in Step 3.
 - **A focus ring on the button.** Focusing **Turn on AI** for VoiceOver draws the browser's ring; the CSS hides it except for keyboard focus.
+- **Pulsing the other provider's button** (hit in BlogPulse, fixed in 1.2.1). Up to 1.2.0 the hand-over pulsed the first **Add key** in the AI sheet, assuming the provider in use comes first. Where the sheet keeps a fixed order (Claude, then OpenAI) and OpenAI is in use, Claude's button pulsed. Target the card marked `.active` (AI configuration marks the provider in use with it), and fall back to the first button only if there is none.
 - **Inviting in the wrong moment.** An invitation in the middle of a recording or a game round is worse than none: use `window.canInvite`.
 
 ## Prompt for Claude
@@ -309,3 +312,4 @@ Add the AI invitation to [App], following the attached doc "AI invitation for Sc
 | 1.0.1 | 2026-10-30 | The page waits for `#splash:not(.gone)` instead of `#splash` (the launch screen stays in the page once hidden); Stockit 1.13.0 is the reference |
 | 1.1.0 | 2026-10-30 | Whether a key exists is the only test: a past key no longer stops the invitation; removing the last key (`aiInviteKeyRemoved` in `airm`) invites from the next launch without the first-day wait; `keyed` renamed `hadKey`. Stockit 1.13.1 is the reference |
 | 1.2.0 | 2026-10-30 | No first-day wait: it can appear on the very first launch, right after installing; the `first` and `hadKey` fields are no longer used. Stockit 1.13.2 is the reference |
+| 1.2.1 | 2026-10-30 | Fix: **Turn on AI** pulses the **Add key** of the provider in use (`#aisheet .aicard.active [data-act="aikey"]`), not the first one in the sheet, which was the wrong provider where the sheet doesn't list the provider in use first. Stockit 1.13.3 is the reference |

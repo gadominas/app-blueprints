@@ -2,10 +2,10 @@
 id: safe-startup
 kind: recipe
 title: Safe start-up for Scriptable apps (no blank screen)
-version: 1.0.0
+version: 1.1.0
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: BlogPulse 1.9.2 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js), Stockit 1.4.1 (https://github.com/gadominas/StockIt/blob/main/Stockit.js)
+reference: BlogPulse 1.12.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js), Stockit 1.13.3 (https://github.com/gadominas/StockIt/blob/main/Stockit.js)
 applies_to: every app with a WebView UI, new or existing
 ---
 
@@ -38,6 +38,7 @@ Seen in BlogPulse (fixed in 1.9.0 to 1.9.2) and Stockit (fixed in 1.4.1).
 2. **Only settings are read before the window**, because every branch needs them (app, widget, Shortcuts). Everything else is read in `loadData()`, after the window is up.
 3. **Every iCloud read has a time limit** (10 s). A file that doesn't arrive in time falls back to its default and is listed in `loadIssues`.
 4. **Never save data that was never read.** `write()` refuses to write a data file until `loadData()` has read everything, and refuses to write `settings.json` if settings weren't read.
+4a. **A damaged file is kept, not obeyed for ever.** A file that arrived but can't be parsed is copied aside once (`<name>.broken-<time>.json`, next to it), the app starts that file from its default and **saving carries on**. Only a file that didn't arrive blocks saving; a damaged one would otherwise stop the app from ever saving again.
 5. **The page boots from data it's handed.** It shows a "Loading your …" placeholder, receives big lists in pieces (`window.__parts`), then `window.__boot(state)` starts the app. It never contains `clientState()` inlined.
 6. **Every message to the page has a time limit** (`ev()`, 20 s).
 7. **One window at a time.** A run holds a lock file in the local temporary directory and refreshes it every second. A new run waits at most 1.5 s for an older window, then opens anyway; it must never refuse to open.
@@ -78,18 +79,35 @@ function startLog(msg) {
 Replace the app's `load()` and `write()`:
 
 ```javascript
-const loadIssues = [];   // files iCloud didn't hand over in time
+const loadIssues = [];    // files that didn't arrive (iCloud too slow, or unreadable): never written this run
+const loadRepaired = [];  // files that arrived damaged: kept aside as <name>.broken-<time>.json, then started fresh
 async function load(n, def, waitMs = 10000) {
   const p = P(n);
   if (!fm.fileExists(p)) return def;
+  let txt;
   try {
     if (fm.isFileStoredIniCloud(p) && !fm.isFileDownloaded(p)) {
       // iCloud can take a long time (or forever, offline): never let start-up hang on it
       await Promise.race([fm.downloadFileFromiCloud(p), new Promise(r => Timer.schedule(waitMs, false, r))]);
       if (!fm.isFileDownloaded(p)) { loadIssues.push(n); startLog(`iCloud didn't deliver ${n}.json in ${waitMs / 1000} s`); return def; }
     }
-    return JSON.parse(fm.readString(p));
-  } catch (e) { loadIssues.push(n); startLog(`Couldn't read ${n}.json: ${e}`); return def; }   // a broken file falls back to defaults, never crashes
+    txt = fm.readString(p);
+  } catch (e) { loadIssues.push(n); startLog(`Couldn't read ${n}.json: ${e}`); return def; }   // not read: never saved over
+  try { return JSON.parse(txt); }
+  catch (e) { keepBroken(fm, p, n, txt); return def; }
+}
+// It arrived but is damaged: keep a copy next to it, then start this file fresh so saving can carry on (1.1.0).
+// Without this, one damaged file stopped the app from ever saving again. The widget reads the data on every refresh
+// and never saves, so a copy that's already there is not made again. The parse error isn't logged: it can quote the file.
+function keepBroken(fm, p, n, txt) {
+  try {
+    const base = p.replace(/\.json$/, ""), dir = p.slice(0, p.lastIndexOf("/")), pre = base.slice(dir.length + 1) + ".broken-";
+    let kept = false;
+    try { kept = fm.listContents(dir).some(f => f.startsWith(pre) && fm.readString(fm.joinPath(dir, f)) === txt); } catch (_) {}
+    if (!kept) fm.writeString(base + ".broken-" + Date.now() + ".json", txt);
+    if (!loadRepaired.includes(n)) loadRepaired.push(n);
+    startLog(`${n}.json was damaged (not valid JSON); ${kept ? "a copy was already kept" : "kept a copy"} and started it fresh`);
+  } catch (e) { loadIssues.push(n); startLog(`${n}.json was damaged and couldn't be copied aside`); }   // no copy, no overwrite
 }
 // Data files are only written once they were read, so a slow start can never save an empty list over them.
 let dataLoaded = false;
@@ -101,6 +119,8 @@ const write = (n, v) => {
 
 `Timer.schedule(ms, false, fn)` is used instead of `setTimeout`, which Scriptable doesn't have.
 
+A file in `loadIssues` (didn't arrive, or couldn't be read) is never written this run. A file in `loadRepaired` (arrived, but wasn't valid JSON) was copied aside first, so writing it is safe: the user's bytes are in `<name>.broken-<time>.json`, and the app can save again. An app that keeps its own backup (for example `data.backup.json`) tries that backup before starting fresh; the damaged file is still copied aside.
+
 ## Step 3: settings at the top, everything else in `loadData()`
 
 Settings stay where the settings blueprint puts them, loaded before every branch. Right after them:
@@ -110,7 +130,7 @@ const settingsOk = !loadIssues.includes("settings");   // settings that were nev
 // Data is read in loadData(): the app shows its first screen before reading it, because iCloud can be slow.
 let stocks = [], market = {}, insights = { briefing: null, stories: {}, ideas: null }, tldrs = {};
 async function loadData() {
-  loadIssues.length = 0;
+  loadIssues.length = 0;   // loadRepaired is kept, so a damaged settings.json (read before this) still gets its toast
   stocks = await load("stocks", []);
   market = await load("market", {});
   insights = await load("insights", { briefing: null, stories: {}, ideas: null });
@@ -226,6 +246,7 @@ async function bootApp(isClosed) {
   try { seen = await ev(`document.visibilityState + ", " + innerWidth + "x" + innerHeight`, 5000); } catch (e) { seen = String(e.message || e); }
   startLog(`screen ready in ${((Date.now() - t0) / 1000).toFixed(1)} s (page: ${seen})`);
   if (loadIssues.length) toast("Some of your data is still coming from iCloud. Nothing will be saved until you reopen Stockit.");
+  else if (loadRepaired.length) toast("Some of your data couldn't be read, so Stockit kept a copy and started it fresh.");
   // Deferred work, once the first screen is drawn: the app's own refresh, then updates, then the widget's icon.
   Timer.schedule(700, false, () => {
     if (isClosed() || !dataLoaded) return;
@@ -320,6 +341,7 @@ On the phone, in light and dark mode:
 - [ ] Tap the widget three times quickly: one window opens, not three.
 - [ ] Close the app during the launch screen, then open it again: it opens, and no data is lost.
 - [ ] Turn on Airplane mode, evict the app's folder from iCloud (Files › Scriptable › the app's folder › long-press › Remove Download), open the app: it opens within ~10 s with what it has, says data is still coming from iCloud, and after closing and reopening online, all data is back.
+- [ ] Put invalid JSON in one data file (for example `stocks.json` → `{oops`), open the app: it opens, says it kept a copy and started fresh, `stocks.broken-<time>.json` holds the old text, and a change you make is still there after reopening.
 - [ ] **Settings › Updates › Start-up log** shows lines like `window on screen`, `data read in 0.3 s: 12 stocks`, `screen ready in 0.6 s (page: visible, 390x844)`.
 - [ ] The widget still shows the app's data (the widget branch reads it).
 - [ ] The update offer still appears a few seconds after opening when a new version exists.
@@ -329,10 +351,13 @@ Statically, before releasing:
 - [ ] `grep -n "await load(" App.js` lists only `settings` at the top and the reads inside `loadData()`.
 - [ ] `grep -n "clientState()" App.js` shows no call inside `buildHTML`.
 - [ ] `main()` loads an empty page, presents it, then loads `buildHTML()`; the widget branch calls `loadData()` first.
-- [ ] A test harness (if the app has one) covers: the empty first window, a file that iCloud never delivers (the app still boots and the file is not overwritten), the widget run, and the start-up log.
+- [ ] A test harness (if the app has one) covers: the empty first window, a file that iCloud never delivers (the app still boots and the file is not overwritten), a damaged file (copied aside, then saved again), the widget run, and the start-up log.
 
 ## Pitfalls
 
+- **A copy on every widget refresh.** The widget reads the data and never saves, so a damaged file is still damaged on its next refresh. `keepBroken` makes a copy only when no identical one exists.
+- **Logging the parse error.** Its message can quote part of the file (a name, an amount). Log the file name and "not valid JSON" only.
+- **A damaged file blocking every save** (found while rolling the recipe out, fixed in 1.1.0). 1.0.0 treated a file that couldn't be parsed like one that didn't arrive, so it was never written again: every change the user made was silently lost until the file was fixed by hand. Separate *didn't arrive* (`loadIssues`, never written) from *arrived damaged* (`loadRepaired`, copied aside, then saved normally).
 - **Settings still have to load first.** Don't move `settings` into `loadData()`: the widget and Shortcuts branches, the theme in `buildHTML()` and the update check all need it.
 - **Never write before reading.** The guard in `write()` is what keeps a slow iCloud from wiping a user's data. Every data file needs to be on its list; a new data file added later must be added there too.
 - **`Timer.schedule` returns a `Timer`**, with `invalidate()`. Test mocks must return an object with `invalidate`, not a number.
@@ -358,3 +383,4 @@ and add the recipe to docs/BLUEPRINTS.md under Recipes.
 | Version | Date | Change |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-30 | First version, from BlogPulse 1.9.0–1.9.2 and Stockit 1.4.1 |
+| 1.1.0 | 2026-10-30 | A damaged (unparseable) file no longer blocks saving for ever: `load()` copies it aside as `<name>.broken-<time>.json`, lists it in `loadRepaired` and starts it from its default; only files that didn't arrive (`loadIssues`) are never written. New rule 4a, `keepBroken` (one copy per damaged content, parse error never logged), toast (also for a damaged `settings.json`: `loadData()` no longer clears `loadRepaired`), test and pitfalls. References: BlogPulse 1.12.0, Stockit 1.13.3 |
