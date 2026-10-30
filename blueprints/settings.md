@@ -4,7 +4,7 @@ title: Settings for Scriptable apps
 version: 1.1.0
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: BlogPulse 1.1.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
+reference: BlogPulse 1.13.0 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
 depends_on: []
 ---
 
@@ -639,4 +639,4 @@ Add the shared Settings sheet to [Go2FGym], following the attached doc "Settings
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-28 | First versioned release |
-| 1.1.0 | 2026-10-30 | Sections are cards: each section's rows sit in one `.grp` card (`--sheet` fill, `--rule` border, 16 radius) under a small muted uppercase heading (`.sec`), so it is clear where a section starts and ends. Built with is a card too. Not yet in the reference app |
+| 1.1.0 | 2026-10-30 | Sections are cards: each section's rows sit in one `.grp` card (`--sheet` fill, `--rule` border, 16 radius) under a small muted uppercase heading (`.sec`), so it is clear where a section starts and ends. Built with is a card too. In BlogPulse 1.13.0 and the other apps, the cards are built by a small `cardSections()` helper right after each render, which gives the same markup |
