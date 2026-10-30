@@ -1,10 +1,10 @@
 ---
 id: ai-invitation
 title: AI invitation for Scriptable apps
-version: 1.0.0
+version: 1.0.1
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: none yet (the first app to adopt it becomes the reference; the code below was tested in a harness, in light and dark mode)
+reference: Stockit 1.13.0 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
 depends_on: [ai-configuration, in-app-updates, settings]
 ---
 
@@ -35,7 +35,7 @@ The pieces, all inside the app's single script:
 
 **An invitation, not a nag: at most one every 3 days, never when there's a key, never on top of anything, and one tap ends it for good.**
 
-Reference implementation: none yet. The first app to adopt this becomes the reference and is recorded here; until then, the code below is the reference. It was tested end to end in a harness (schedule over eight weeks, the page in a browser, light and dark).
+Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob/main/Stockit.js) (search for `aiInvite`). The code below is the same code, with names kept, so the two can be compared line by line; Stockit reaches the page with `call("__aiInvite", AI_INVITE)`, its name for `js()`.
 
 ## The rules
 
@@ -155,7 +155,7 @@ window.__aiInvite = function (c) {
   var tries = 0;
   (function wait() {
     // Never over the launch screen, another sheet, or a task the app says can't be interrupted.
-    var busy = document.getElementById("splash") || document.getElementById("upd") || document.getElementById("aiinv") ||
+    var busy = document.querySelector("#splash:not(.gone)") || document.getElementById("upd") || document.getElementById("aiinv") ||
       document.querySelector(".sheet.open, #cfgsheet.open, #aisheet.open") || (window.canInvite && !window.canInvite());
     if (busy) { if (++tries < 40) setTimeout(wait, 500); return; }   // gives up after 20 s; it comes back another day
     setTimeout(function () { if (!document.getElementById("aiinv")) showInvite(c); }, 600);
@@ -203,7 +203,7 @@ Rules:
 
 1. **`window.__aiOpen()`** must open the AI settings sheet, exactly as the Settings row's `aiopen` action does. If the app has no such function yet, add the one-liner next to that action: `window.__aiOpen = function () { aiOpen = true; renderAI(); };`.
 2. **`window.canInvite`** (optional): return `false` while the user must not be interrupted (a recording, a round of a game, a half-filled form). Leave it undefined if the app has no such moment.
-3. **The busy check names the shared layers** (`#splash`, `#upd`, `#cfgsheet`, `#aisheet`, `.sheet.open`). If the app has another overlay, add its selector there.
+3. **The busy check names the shared layers** (`#splash` until it has `.gone`, `#upd`, `#cfgsheet`, `#aisheet`, `.sheet.open`). If the app has another overlay, add its selector there.
 4. **Escape everything** from `AI_INVITE` with `escI`: the title and perks are plain text.
 
 ## Step 5: the look
@@ -273,6 +273,7 @@ Run these on a phone, in light and dark mode, with and without Reduce Motion.
 
 ## Pitfalls
 
+- **Waiting forever for the launch screen** (hit in Stockit, fixed in 1.0.1). The launch-screen blueprint hides `#splash` by adding `.gone` and leaves it in the page, so a check for `#splash` alone stays busy for ever and the invitation silently never appears. Check `#splash:not(.gone)`.
 - **Hard-coded white on the button** (hit while building this). On dark palettes the accent is light and white text disappears. The button's text uses `var(--sheet)`, which is light on light palettes and dark on dark ones.
 - **The card's edge vanishes in dark mode** (hit while building this). A dark card on a dimmed dark page has no visible edge; the 1 px `var(--rule)` border fixes it.
 - **Counting invitations the user never saw.** If `shown` is recorded when the Scriptable side asks rather than when the page shows the card, a busy launch eats an invitation. Only the page sends `shown`.
@@ -301,3 +302,4 @@ Add the AI invitation to [App], following the attached doc "AI invitation for Sc
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-30 | First versioned release |
+| 1.0.1 | 2026-10-30 | The page waits for `#splash:not(.gone)` instead of `#splash` (the launch screen stays in the page once hidden); Stockit 1.13.0 is the reference |

@@ -13,7 +13,7 @@ Read this whole file before changing any code.
 | `ai-configuration` | AI configuration | 1.0.0 | [blueprints/ai-configuration.md](blueprints/ai-configuration.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-configuration.md | https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js (v1.0.0) | `in-app-updates`, `settings` |
 | `launch-screen` | Launch screen | 1.0.0 | [blueprints/launch-screen.md](blueprints/launch-screen.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/launch-screen.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.17.1) | — |
 | `widgets` | Widgets | 1.0.0 | [blueprints/widgets.md](blueprints/widgets.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/widgets.md | https://github.com/gadominas/VisionX/blob/main/VisionX.js (v1.19.0) | `settings`, `launch-screen` |
-| `ai-invitation` | AI invitation | 1.0.0 | [blueprints/ai-invitation.md](blueprints/ai-invitation.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-invitation.md | None yet (the first app to adopt it) | `ai-configuration`, `in-app-updates`, `settings` |
+| `ai-invitation` | AI invitation | 1.0.1 | [blueprints/ai-invitation.md](blueprints/ai-invitation.md) | https://raw.githubusercontent.com/gadominas/app-blueprints/main/blueprints/ai-invitation.md | https://github.com/gadominas/Stockit/blob/main/Stockit.js (v1.13.0) | `ai-configuration`, `in-app-updates`, `settings` |
 
 A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `depends_on`) is the source of truth; this table mirrors it.
 
