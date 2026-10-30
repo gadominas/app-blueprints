@@ -254,4 +254,4 @@ End every blueprint task with:
 
 ## 9. Not covered here: repository sites
 
-Rebuilding an app's README, screenshots, badges or GitHub About box is a separate task with its own instructions: [`repo-site/REBUILD.md`](repo-site/REBUILD.md). It is not a blueprint, has no version or trace, and must not change an app's script, `VERSION` or `releases.json`.
+Rebuilding an app's README, screenshots, badges or GitHub About box is a separate task with its own instructions: [`repo-site/REBUILD.md`](repo-site/REBUILD.md). How an app is installed (one generated `install.js`, the same two-line loader and Install section in every README) is in [`repo-site/INSTALL-GUIDE.md`](repo-site/INSTALL-GUIDE.md). It is not a blueprint, has no version or trace, and must not change an app's script, `VERSION` or `releases.json`.

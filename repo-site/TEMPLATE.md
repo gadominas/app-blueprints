@@ -53,21 +53,29 @@
 <!-- rows of three, in shot order; the last row may hold one or two. Widget cards go in the last row. -->
 
 ## Install
+<!-- Exactly as below, in every app (INSTALL-GUIDE.md). Only the end of step 3 and the "What else you need" bullets are the app's own.
+     {{KEPT}} is install.kept from docs/site/repo.json, the same sentence the installer shows. -->
 
 1. Get **[Scriptable](https://apps.apple.com/app/scriptable/id1405459188)** (free) on your iPhone or iPad.
-2. {{INSTALLER_STEP}}
-3. {{FIRST_RUN_STEP}}
+2. In Scriptable, tap **+**, paste these two lines, name the script *{{NAME}} Installer*, and tap **▶**:
+   ```js
+   const code = await new Request("https://raw.githubusercontent.com/{{REPO}}/{{BRANCH}}/install.js").loadString();
+   await eval("(async () => {" + code + "\n})()");
+   ```
+3. Tap **Open {{NAME}}**{{FIRST_RUN: the rest of the first run, e.g. " and sign in with your TAMO username and password."}}
 
-{{UPDATE_LINE: e.g. "To update, run the installer again; your data and settings are kept."}}
+To update, tap **Update now** when {{NAME}} offers a new version, or run *{{NAME}} Installer* again. {{KEPT}}
 
 <details>
 <summary><b>Install by hand</b></summary>
 
-{{MANUAL_INSTALL}}
+Rather not use the loader? Paste [`install.js`](install.js) or [`{{FILE}}`]({{FILE_URL}}) into a new script in Scriptable yourself.
 
 </details>
 
-{{REQUIREMENTS_OR_NOTHING: what else is needed (an account, a key, a shortcut), as a short list}}
+What else you need:
+
+- {{REQUIREMENT: anything else needed or worth doing (an account, an API key, a shortcut, a Home Screen icon), one short bullet each; leave the list out if there is nothing}}
 
 ## How to use it
 

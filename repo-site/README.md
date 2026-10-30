@@ -8,6 +8,9 @@ This is **not a blueprint**. The blueprints in [`../blueprints`](../blueprints) 
 | --- | --- |
 | [`REBUILD.md`](REBUILD.md) | The instructions: what every repository page has, how to choose and regenerate the screenshots, how to write the README, the About box, a checklist and a prompt for a coding agent |
 | [`TEMPLATE.md`](TEMPLATE.md) | The README skeleton every app repository follows |
+| [`INSTALL-GUIDE.md`](INSTALL-GUIDE.md) | How every app is installed: one generated `install.js`, the same two-line loader and the same Install section, with VisionX as the reference |
+| [`templates/install.js`](templates/install.js) | The installer every app's `install.js` is generated from |
+| [`tools/make-installer.js`](tools/make-installer.js) | Generates (or `--check`s) an app's `install.js` from the template, its script and `docs/site/repo.json` |
 | [`tools/scriptable-emulator.js`](tools/scriptable-emulator.js) | Runs a Scriptable script in Node with headless Chromium behind every `WebView`, fixtures behind every request, and widgets drawn as HTML |
 | [`tools/capture.js`](tools/capture.js) | Runs an app's `docs/site/scenario.js` and writes its cards to `docs/screenshots/` |
 | [`tools/compose.js`](tools/compose.js) | The card design: brand ground, numbered label, caption, borderless rounded screen |
@@ -19,6 +22,7 @@ Quick start, with the apps checked out next to `app-blueprints`:
 ```bash
 (cd app-blueprints/repo-site && npm install)
 node app-blueprints/repo-site/tools/capture.js BlogPulse
+node app-blueprints/repo-site/tools/make-installer.js BlogPulse
 node app-blueprints/repo-site/tools/check-readme.js BlogPulse
 app-blueprints/repo-site/tools/apply-about.sh BlogPulse
 ```

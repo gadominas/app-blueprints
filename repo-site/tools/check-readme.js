@@ -2,10 +2,12 @@
 // Checks an app README against repo-site/TEMPLATE.md:
 //   node repo-site/tools/check-readme.js <app-repo-dir> [more dirs…]
 // Header block and badges, section order, local image and link targets, in-page anchors,
-// unused screenshot cards, docs/site/repo.json. Exit code 1 when anything is off.
+// unused screenshot cards, docs/site/repo.json, and the Install section and install.js (INSTALL-GUIDE.md).
+// Exit code 1 when anything is off.
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const installer = require('./make-installer.js');
 
 const SECTIONS = ['Highlights', 'Screenshots', 'Install', 'How to use it', 'Widget', 'AI', 'Settings', 'Updates and what\'s new',
   'Privacy and security', 'How it works', 'Troubleshooting', 'Built with', 'Disclaimer', 'More apps like this', 'License'];
@@ -40,6 +42,27 @@ for (const dir of process.argv.slice(2)) {
   // unused cards
   const shots = path.join(dir, 'docs', 'screenshots');
   if (fs.existsSync(shots)) for (const f of fs.readdirSync(shots)) if (!md.includes('docs/screenshots/' + f)) problems.push('unused card: docs/screenshots/' + f);
+  // Install (INSTALL-GUIDE.md): the same section in every app, and a generated install.js beside the script
+  try {
+    const a = installer.appInfo(dir);
+    const sec = (md.split(/^## Install\s*$/m)[1] || '').split(/^## /m)[0];
+    const fileUrl = a.file.split('/').map(encodeURIComponent).join('/');
+    const want = [
+      ['step 1', '1. Get **[Scriptable](https://apps.apple.com/app/scriptable/id1405459188)** (free) on your iPhone or iPad.'],
+      ['step 2', `2. In Scriptable, tap **+**, paste these two lines, name the script *${a.name} Installer*, and tap **▶**:`],
+      ['loader line 1', `   const code = await new Request("https://raw.githubusercontent.com/${a.repo}/${a.branch}/install.js").loadString();`],
+      ['loader line 2', '   await eval("(async () => {" + code + "\\n})()");'],
+      ['step 3', `3. Tap **Open ${a.name}**`],
+      ['update line', `To update, tap **Update now** when ${a.name} offers a new version, or run *${a.name} Installer* again. ${a.kept}`],
+      ['Install by hand', '<summary><b>Install by hand</b></summary>'],
+      ['manual line', `Rather not use the loader? Paste [\`install.js\`](install.js) or [\`${a.file}\`](${fileUrl}) into a new script in Scriptable yourself.`],
+    ];
+    for (const [what, line] of want) if (!sec.includes(line)) problems.push('Install: ' + what + ' must read: ' + line.trim());
+    const p = path.join(dir, 'install.js');
+    if (!fs.existsSync(p) || fs.readFileSync(p, 'utf8') !== installer.render(a)) problems.push('install.js is missing or not generated from the template: run repo-site/tools/make-installer.js');
+    for (const f of fs.readdirSync(dir)) if (/^install .*\.js$/i.test(f)) problems.push('remove the old installer: ' + f + ' (install.js replaces it)');
+    if (fs.existsSync(path.join(dir, 'docs', 'INSTALL.md'))) problems.push('remove docs/INSTALL.md: installing is the README\'s Install section; move anything else into the README');
+  } catch (e) { problems.push('Install: ' + e.message); }
   // About
   try {
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'docs', 'site', 'repo.json'), 'utf8'));
