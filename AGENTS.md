@@ -1,6 +1,6 @@
 # Instructions for coding agents
 
-You are applying shared blueprints to one of Gediminas Siutilas’s apps. The goal is that every app looks, feels and behaves the same for the capabilities covered here. Follow the blueprints **exactly**: same structure, same function names, same UI order, same wording. Adapt only what is explicitly per-app.
+You are applying shared blueprints and recipes to one of Gediminas Siutilas’s apps. The goal is that every app looks, feels and behaves the same for the capabilities covered here, and that a bug fixed in one app is fixed the same way in all of them. Follow the blueprints **exactly**: same structure, same function names, same UI order, same wording. Adapt only what is explicitly per-app.
 
 Read this whole file before changing any code.
 
@@ -19,6 +19,23 @@ A blueprint's front matter (`id`, `title`, `version`, `updated`, `reference`, `d
 When asked to “apply all blueprints”, apply them in the order of this table: `in-app-updates`, `settings`, `ai-configuration`, `launch-screen`, `widgets`. Every change ships as a version (in-app updates), the Settings sheet is where the AI settings row lives, AI configuration follows, then the launch screen, which touches nothing else, and last the widget, which takes its tunables from Settings and its name and accent from the launch screen.
 
 **Overlaps.** `ai-configuration` governs AI keys, providers, models and token usage; `settings` governs every other user choice. Never add an API key field, model field or thinking-effort control to the Settings sheet: put one **AI settings** row in the main feature's section instead. When `settings` is applied to an app that already follows `ai-configuration`, keep its AI sheet as it is.
+
+## 1a. Recipes (apply them always)
+
+A **recipe** is a set of coding rules that fixes a class of bug once, the same way in every app. It adds no feature the user sees, so it is not a blueprint: there is nothing to opt into. **Every app follows every recipe.**
+
+| Id | Name | Version | File | Prevents | Reference implementations |
+| --- | --- | --- | --- | --- | --- |
+| `safe-startup` | Safe start-up | 1.0.0 | [recipes/safe-startup.md](recipes/safe-startup.md) | Blank or black screen on open, especially from the widget, after quick taps, or with slow iCloud; data overwritten after a failed read | BlogPulse 1.9.2, Stockit 1.4.1 |
+
+Apply the recipes:
+
+- **When building a new app:** from the first commit, before any feature.
+- **When applying any blueprint, rebuilding or refactoring an app:** check the app against every recipe first, and apply what's missing in the same release. Touching start-up, storage, the run code (`main()`), the widget branch or the page's boot means re-checking `safe-startup`.
+- **When fixing a bug whose symptom a recipe lists** (for example "blank screen when opened from the widget"): apply the recipe, don't write a local fix. If the recipe doesn't cover the case, fix the recipe here and then apply it.
+- **When asked to review an app:** report recipe gaps with the blueprint gaps (section 7).
+
+How to apply one: read the whole recipe (its rules, per-app values, steps, testing checklist and pitfalls are requirements), adapt only the per-app values it lists, keep its names (`loadData`, `bootApp`, `startLog`, `__boot`, `__parts`, …), run its static checks, and copy its testing checklist into your summary. Record it in the app's `docs/BLUEPRINTS.md` under a **Recipes** heading (`| Recipe | Version | Since app version | Deviations |`). Recipes don't go in the script's `BLUEPRINTS` block or in Built with: they describe how the code is written, not what the user gets.
 
 ## 2. What these blueprints target
 
@@ -55,7 +72,7 @@ Before writing code, establish and state these values. Infer them from the targe
 
 ### Step 2: read before you write
 
-1. Read the full blueprint, not just the code blocks. The rules, tables and pitfalls are requirements.
+1. Read the full blueprint, not just the code blocks. The rules, tables and pitfalls are requirements. Read every recipe in section 1a too, and check the app against them.
 2. Open the reference implementation and compare. If the blueprint and the reference disagree, the **blueprint wins**; mention the difference in your summary.
 3. Read the target app’s script end to end: its settings block, bridge, click handler, state pushed to the page, theme variables and start-up order.
 
@@ -76,13 +93,14 @@ You usually cannot run Scriptable. Do everything you can statically, then hand t
 - Grep for the invariants in section 5.
 - Check `releases.json` is valid JSON, newest first, and its top `version` equals `VERSION` in the script.
 - Run `node tools/changelog.js` and include the regenerated `CHANGELOG.md`.
-- Copy the blueprint’s **testing checklist** into your final summary for the user to run on a phone, in light and dark mode.
+- Copy the blueprint’s **testing checklist** into your final summary for the user to run on a phone, in light and dark mode, plus the checklist of every recipe you applied.
+- Run each applied recipe's static checks (for `safe-startup`: no top-level `await load(...)` except settings, no `clientState()` in `buildHTML`, empty window before the real page, `loadData()` in the widget branch).
 
 ### Step 5: release and record
 
 1. Bump `VERSION`, add the `releases.json` entry (three user-facing highlights), regenerate `CHANGELOG.md`.
 2. Commit the script first and `releases.json` last, so the update offer never appears before the new script exists.
-3. Leave the trace (see [Blueprint versions and traces](#4-blueprint-versions-and-traces)): update the `BLUEPRINTS` block in the script, **Built with** in Settings, and `docs/BLUEPRINTS.md`. Do this in the same commit as the code change, every time a blueprint is applied, upgraded or partly removed.
+3. Leave the trace (see [Blueprint versions and traces](#4-blueprint-versions-and-traces)): update the `BLUEPRINTS` block in the script, **Built with** in Settings, and `docs/BLUEPRINTS.md`, including its **Recipes** table. Do this in the same commit as the code change, every time a blueprint is applied, upgraded or partly removed.
 4. Push to `main` unless the user asks for a pull request.
 
 ## 4. Blueprint versions and traces
@@ -179,6 +197,15 @@ An app carries its trace in three places, which must always agree:
 - OpenAI requests omit `max_tokens`; Claude requests include it.
 - Without a key, AI-only features are hidden (not disabled), fallbacks are labelled “no AI”, and every hint points to **Settings › AI settings**.
 
+**Start-up (recipe `safe-startup`)**
+- Only settings are read before the window; every other data file is read in `loadData()` after an empty window in the app's ground colour is on screen, and the real page is built inside that visible window.
+- Every iCloud read has a time limit; a data file that wasn't read is never written.
+- The page boots from data it's handed (`window.__parts`, `window.__boot`); `buildHTML()` never inlines `clientState()`; every `evaluateJavaScript` at start-up has a time limit.
+- One window at a time (lock in the local temporary directory, wait at most 1.5 s, never refuse to open).
+- The app's own refresh, the update check and the widget icon start after the first screen (0.7 s, 3.5 s, 6 s).
+- A start-up log is kept locally and shown in **Settings › Updates › Start-up log**; a stalled start-up says so on screen.
+- The widget branch calls `loadData()` itself and never builds a WebView.
+
 **UI and feel**
 - Shared sheets use the app’s own theme variables and work in light and dark mode.
 - Fixed order in the AI sheet: provider in use, other provider, What AI does, Token usage.
@@ -199,7 +226,7 @@ An app carries its trace in three places, which must always agree:
 
 ## 7. Conformance review (when asked to check an app)
 
-Do not change code. Start from `node tools/inventory.js` to see what each app claims; then read the code to check the claim. For each applicable blueprint, report:
+Do not change code. Start from `node tools/inventory.js` to see what each app claims; then read the code to check the claim. For each applicable blueprint, and for every recipe, report:
 
 1. **Missing**: steps or features not present.
 2. **Divergent**: present but with different names, order, wording, storage or behaviour.
@@ -211,6 +238,7 @@ Do not change code. Start from `node tools/inventory.js` to see what each app cl
 End every blueprint task with:
 
 - the per-app parameters you used,
+- the recipes you applied or checked, with their versions,
 - the app's `BLUEPRINTS` block after your change (blueprint versions and `since`),
 - what changed, file by file,
 - deviations and why,

@@ -27,6 +27,16 @@ This repository fixes that by keeping one answer per problem:
 
 Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet), then **Launch screen** (self-contained, touches nothing else), then **Widgets** (uses the Settings tunables and the launch screen's name and accent). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
 
+## Recipes
+
+A **recipe** is a set of coding rules that every app follows while it's built, rebuilt or refactored. It fixes a class of bug once, the same way everywhere, and adds nothing the user sees, so there is nothing to opt into: **every app follows every recipe**.
+
+| Recipe | Version | What it prevents | Reference apps | Updated |
+| --- | --- | --- | --- | --- |
+| [Safe start-up](recipes/safe-startup.md) | 1.0.0 | A blank or black screen when the app opens, especially from its widget, after quick taps or with slow iCloud; data saved over after a failed read. The window comes first, data is read after with time limits, the page boots from handed-over data, one window at a time, background work waits for the first screen, and a start-up log in Settings | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.9.2, [StockIt](https://github.com/gadominas/StockIt) 1.4.1 | 2026-10-30 |
+
+Apply recipes to a new app from its first commit, and to an existing app whenever you apply a blueprint or touch its start-up, storage or run code. When a bug matches a recipe's symptom, apply the recipe rather than a local fix. Each app lists the recipes it follows in `docs/BLUEPRINTS.md` under **Recipes**.
+
 ## Repository layout
 
 ```
@@ -34,6 +44,9 @@ app-blueprints/
 ├── README.md                 ← you are here: what this is and how to use it
 ├── AGENTS.md                 ← instructions for coding agents (Claude Code, Codex, Cursor, …)
 ├── CLAUDE.md                 ← points Claude Code at AGENTS.md
+├── .github/copilot-instructions.md ← points GitHub Copilot at AGENTS.md
+├── recipes/
+│   └── safe-startup.md       ← no blank screen on open; window first, data after
 ├── blueprints/
 │   ├── in-app-updates.md
 │   ├── settings.md
@@ -43,7 +56,8 @@ app-blueprints/
 ├── docs/
 │   └── widgets.png           ← every app's widget in the shared frame
 ├── templates/
-│   └── blueprint-template.md ← skeleton for writing a new blueprint
+│   ├── blueprint-template.md ← skeleton for writing a new blueprint
+│   └── recipe-template.md    ← skeleton for writing a new recipe
 └── tools/
     ├── inventory.js          ← which app follows which blueprint version
     └── apps.json             ← the apps the inventory checks
@@ -57,7 +71,7 @@ Point the agent at this repository and the target app. For example, in Claude Co
 
 ```markdown
 Follow https://github.com/gadominas/app-blueprints/blob/main/AGENTS.md.
-Apply all blueprints to [Go2FGym]:
+Apply all blueprints and recipes to [Go2FGym]:
 - Repository: github.com/gadominas/[Go2FGym], branch main, script [Go2FGym.js]
 - APP_ID: [go2fgym], next version: [1.1.0]
 - AI features and their usage labels: [suggestions: "Comment ideas"]
@@ -111,6 +125,13 @@ These hold across every blueprint and every app:
 - **Shared sheets use the shared colour tokens**, so they follow every palette in light and dark mode. Shared class names are prefixed (`upd…`, `ai…`).
 - **Destructive actions take two taps** (button turns into **Confirm** for ~3.5 s).
 - **Every release** bumps `VERSION`, adds a `releases.json` entry with three user-facing highlights and regenerates `CHANGELOG.md`.
+
+## Adding or changing a recipe
+
+1. Fix the bug in a real app first, release it, and confirm the fix on a phone.
+2. Copy [`templates/recipe-template.md`](templates/recipe-template.md) to `recipes/<kebab-case-name>.md`: the symptom, the causes, the rules, the per-app values, the code from the fixed app with names kept, a testing checklist and the pitfalls.
+3. Add a row to the recipe table above **and** in [`AGENTS.md`](AGENTS.md) (section 1a), starting at version 1.0.0, and add the recipe's rules to the invariants in `AGENTS.md`.
+4. To change a recipe, bump its version, add a row to its **Version history**, update `updated` and both tables, then tag it: `git tag safe-startup-v1.1.0 && git push origin safe-startup-v1.1.0`.
 
 ## Adding or changing a blueprint
 
