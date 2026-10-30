@@ -1,10 +1,10 @@
 ---
 id: ai-invitation
 title: AI invitation for Scriptable apps
-version: 1.0.1
+version: 1.1.0
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: Stockit 1.13.0 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
+reference: Stockit 1.13.1 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
 depends_on: [ai-configuration, in-app-updates, settings]
 ---
 
@@ -12,7 +12,7 @@ depends_on: [ai-configuration, in-app-updates, settings]
 
 ## Overview
 
-Most of the apps do far more with an AI key than without one, but an app without a key hides its AI features (AI configuration, Step 8), so a new user may never learn they exist. The AI invitation closes that gap: a short, animated card that names three things AI adds to *this* app, says it takes three steps, and takes the user straight to **AI settings** with **Add key** highlighted. It shows up on launch at a calm pace (about twice a week at first, weekly after a few "Later"s), never when a key exists, never over anything else, and stops for good with one tap.
+Most of the apps do far more with an AI key than without one, but an app without a key hides its AI features (AI configuration, Step 8), so a new user may never learn they exist. The AI invitation closes that gap: a short, animated card that names three things AI adds to *this* app, says it takes three steps, and takes the user straight to **AI settings** with **Add key** highlighted. It shows up on launch at a calm pace (about twice a week at first, weekly after a few "Later"s), only while there is no key, never over anything else, and stops for good with one tap.
 
 What the user sees, in every app:
 
@@ -27,13 +27,13 @@ The pieces, all inside the app's single script:
 | Piece | Lives in | Job |
 | --- | --- | --- |
 | `AI_INVITE` | Top of the script | What this app promises: a title and exactly three perks |
-| `aiInviteDue`, `aiInviteNote` | Scriptable side | The schedule, kept in `settings.aiInvite` |
+| `aiInviteDue`, `aiInviteNote`, `aiInviteKeyRemoved` | Scriptable side | The schedule, kept in `settings.aiInvite` |
 | `inviteIfDue` | Scriptable side, at start-up | Offers the invitation once the update check has settled, unless an update is being offered |
 | `aiinvite` bridge action | Scriptable side | Records what the user did: shown, open, later, never |
 | `window.__aiInvite`, `showInvite`, `closeInvite` | The page's script | Waits until nothing else is on screen, shows the card, hands over to AI settings |
 | `#aiinv` CSS and `aiinv*` keyframes | The page's `<style>` | The card and its animation, Reduce Motion aware |
 
-**An invitation, not a nag: at most one every 3 days, never when there's a key, never on top of anything, and one tap ends it for good.**
+**An invitation, not a nag: whether a key exists is the only test of whether AI is on; at most one every 3 days, never on top of anything, and one tap ends it for good.**
 
 Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob/main/Stockit.js) (search for `aiInvite`). The code below is the same code, with names kept, so the two can be compared line by line; Stockit reaches the page with `call("__aiInvite", AI_INVITE)`, its name for `js()`.
 
@@ -41,9 +41,9 @@ Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob
 
 | Rule | What it means |
 | --- | --- |
-| Only without AI | Shown only when no AI key exists (`aiKey()` is empty). |
-| Once there was a key, never again | When a key is found, `aiInvite.keyed` is set; even if the key is removed later, the invitation does not return. A user who removed AI did so on purpose. |
-| Not on the first day | The first launch only starts the clock. The earliest invitation is 24 hours later, so the app gets to speak for itself first. |
+| The key decides | Shown only when no AI key exists (`aiKey()` is empty). Nothing else counts as "AI on": not the provider marked **In use**, not a loaded model list, not the **What AI does** switches. |
+| Removing a key brings it back | Removing the last key (the `airm` action) makes it eligible from the next launch, without the first-day wait. A key the user had before never blocks it. |
+| Not on the first day | For a new user, the first launch only starts the clock and the earliest invitation is 24 hours later, so the app gets to speak for itself first. Someone who has had a key skips this. |
 | Pace | At most once every **3 days** (about twice a week). After the **4th "Later"** the gap becomes **7 days**. Eight weeks of always tapping "Later" means 10 invitations. |
 | One offer per launch | Never on a launch that offers an update: `inviteIfDue` runs after the update check and does nothing when `pendingUpdate` is set. |
 | Never on top of anything | The page waits until the launch screen is gone and no sheet is open (Settings, AI settings, the update sheet, the app's own `.sheet.open`), then 0.6 s more. An app can also hold it back with `window.canInvite()` (during a recording, a game round, a form). |
@@ -60,7 +60,7 @@ The state lives in `settings.json` (settings blueprint) as `settings.aiInvite`, 
 | `shown` | How many times the card appeared |
 | `later` | How many times the user chose Later (or tapped the backdrop) |
 | `off` | The user chose **Don't remind me again** |
-| `keyed` | A key existed at some point; never invite again |
+| `hadKey` | A key existed at some point; skips the first-day wait (1.0.x stored this as `keyed`, read once and renamed) |
 
 ## Step 1: the promise
 
@@ -96,11 +96,18 @@ const INVITE_GAP = 3;          // days between invitations (about twice a week)
 const INVITE_GAP_SLOW = 7;     // days between invitations after the 4th "Later"
 function aiInviteDue(now = Date.now()) {
   const s = settings.aiInvite || (settings.aiInvite = {});
-  if (aiKey()) { if (!s.keyed) { s.keyed = true; saveAll(); } return false; }   // has a key, or had one: never again
-  if (!s.first) { s.first = now; saveAll(); return false; }   // first launch: let the app speak for itself first
-  if (s.off || s.keyed) return false;
-  if (now - s.first < INVITE_DAY) return false;
+  if (s.keyed) { s.hadKey = true; delete s.keyed; }   // 1.0.x called it "keyed"
+  if (aiKey()) { if (!s.hadKey) { s.hadKey = true; saveAll(); } return false; }   // a key means AI is on: nothing to invite to
+  if (s.off) return false;   // "Don't remind me again"
+  if (!s.first) { s.first = now; saveAll(); }
+  if (!s.hadKey && now - s.first < INVITE_DAY) return false;   // a new user gets a day with the app first; someone who removed a key doesn't
   return now >= (s.next || 0);
+}
+// Removing the last key turns AI off: invite again from the next launch (call this in the "airm" action).
+function aiInviteKeyRemoved() {
+  if (aiKey()) return;
+  const s = settings.aiInvite || (settings.aiInvite = {});
+  s.hadKey = true; s.next = 0; saveAll();
 }
 // The page reports what happened: "shown", "open", "later" or "never".
 function aiInviteNote(what, now = Date.now()) {
@@ -139,10 +146,10 @@ case "aiinvite": aiInviteNote(m.v); return;
 | --- | --- | --- |
 | `aiinvite` | `v`: `shown`, `open`, `later` or `never` | `aiInviteNote(v)`: schedules the next invitation or stops them |
 
-**A key ends it for good.** In the `aikey` action (AI configuration, Step 6), right after `askKey` succeeds, mark it, so the invitation stops even before the next launch would notice:
+**Removing the last key invites again.** In the `airm` action (AI configuration, Step 6), right after `removeKey`, call `aiInviteKeyRemoved()`. Adding a key needs no hook: `aiInviteDue` sees it at the next launch.
 
 ```javascript
-settings.aiInvite = Object.assign(settings.aiInvite || {}, { keyed: true });
+case "airm": { const p = m.v; removeKey(p); toast(`${PROVIDERS[p]} key removed`); aiInviteKeyRemoved(); saveAll(); return push(); }
 ```
 
 ## Step 4: the page
@@ -263,16 +270,18 @@ Run these on a phone, in light and dark mode, with and without Reduce Motion.
 - [ ] First launch without a key: no invitation. Set `settings.aiInvite.first` back 2 days and relaunch: the card appears after the launch screen has gone.
 - [ ] The card springs up, the perks slide in one by one, the ✦ twinkles, **Turn on AI** glows twice; nothing moves with Reduce Motion on.
 - [ ] Title and perks fit without overflow at **Larger** text, on the smallest supported phone.
-- [ ] **Turn on AI**: the card closes, AI settings slides up, **Add key** pulses; adding a key there ends the invitations for good.
+- [ ] **Turn on AI**: the card closes, AI settings slides up, **Add key** pulses; with a key saved, no invitation on the next launches.
 - [ ] **Later**, and a tap on the dimmed backdrop: the card closes; it doesn't return on the next launch the same day.
 - [ ] **Don't remind me again**: it never returns, however long you wait.
 - [ ] With an update available (bump `VERSION` down), only the update sheet appears that launch.
-- [ ] With a key saved, the invitation never appears, even after removing the key.
+- [ ] With a key saved, no invitation. Remove the last key, close the app and open it again: the invitation appears (no first-day wait), even if it was shown yesterday.
 - [ ] Opening the widget or a Shortcut never shows it.
 - [ ] Every palette: the button text is readable on the accent, and the card's edge is visible on dark pages.
 
 ## Pitfalls
 
+- **Treating a past key as "AI on"** (hit in Stockit, fixed in 1.1.0). 1.0.x stopped for good once a key had existed, so a user who removed their key never saw the invitation. The key alone decides; 1.1.0 renames the old `keyed` flag to `hadKey` and only uses it to skip the first-day wait.
+- **Reading "In use" as "AI on".** The AI sheet marks a provider **In use** even without a key: it is the provider that *would* be called. Never use it, a model list or a switch to decide whether to invite; use `aiKey()`.
 - **Waiting forever for the launch screen** (hit in Stockit, fixed in 1.0.1). The launch-screen blueprint hides `#splash` by adding `.gone` and leaves it in the page, so a check for `#splash` alone stays busy for ever and the invitation silently never appears. Check `#splash:not(.gone)`.
 - **Hard-coded white on the button** (hit while building this). On dark palettes the accent is light and white text disappears. The button's text uses `var(--sheet)`, which is light on light palettes and dark on dark ones.
 - **The card's edge vanishes in dark mode** (hit while building this). A dark card on a dimmed dark page has no visible edge; the 1 px `var(--rule)` border fixes it.
@@ -303,3 +312,4 @@ Add the AI invitation to [App], following the attached doc "AI invitation for Sc
 | --- | --- | --- |
 | 1.0.0 | 2026-10-30 | First versioned release |
 | 1.0.1 | 2026-10-30 | The page waits for `#splash:not(.gone)` instead of `#splash` (the launch screen stays in the page once hidden); Stockit 1.13.0 is the reference |
+| 1.1.0 | 2026-10-30 | Whether a key exists is the only test: a past key no longer stops the invitation; removing the last key (`aiInviteKeyRemoved` in `airm`) invites from the next launch without the first-day wait; `keyed` renamed `hadKey`. Stockit 1.13.1 is the reference |
