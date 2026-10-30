@@ -1,10 +1,10 @@
 ---
 id: ai-invitation
 title: AI invitation for Scriptable apps
-version: 1.1.0
+version: 1.2.0
 updated: 2026-10-30
 author: Gediminas Siutilas
-reference: Stockit 1.13.1 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
+reference: Stockit 1.13.2 (https://github.com/gadominas/Stockit/blob/main/Stockit.js)
 depends_on: [ai-configuration, in-app-updates, settings]
 ---
 
@@ -42,8 +42,8 @@ Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob
 | Rule | What it means |
 | --- | --- |
 | The key decides | Shown only when no AI key exists (`aiKey()` is empty). Nothing else counts as "AI on": not the provider marked **In use**, not a loaded model list, not the **What AI does** switches. |
-| Removing a key brings it back | Removing the last key (the `airm` action) makes it eligible from the next launch, without the first-day wait. A key the user had before never blocks it. |
-| Not on the first day | For a new user, the first launch only starts the clock and the earliest invitation is 24 hours later, so the app gets to speak for itself first. Someone who has had a key skips this. |
+| From the first launch | It can appear the very first time the app opens, right after installing: that is when a new user most needs to know what AI adds. |
+| Removing a key brings it back | Removing the last key (the `airm` action) makes it eligible from the next launch, even inside the 3-day gap. A key the user had before never blocks it. |
 | Pace | At most once every **3 days** (about twice a week). After the **4th "Later"** the gap becomes **7 days**. Eight weeks of always tapping "Later" means 10 invitations. |
 | One offer per launch | Never on a launch that offers an update: `inviteIfDue` runs after the update check and does nothing when `pendingUpdate` is set. |
 | Never on top of anything | The page waits until the launch screen is gone and no sheet is open (Settings, AI settings, the update sheet, the app's own `.sheet.open`), then 0.6 s more. An app can also hold it back with `window.canInvite()` (during a recording, a game round, a form). |
@@ -51,16 +51,14 @@ Reference implementation: [Stockit.js](https://github.com/gadominas/Stockit/blob
 | App only | Never from the widget, a Shortcut or a background run: only where the app's page is presented. |
 | Same words everywhere | The lead line, the three steps and the three buttons are fixed text (below); only the title and the perks are the app's own. |
 
-The state lives in `settings.json` (settings blueprint) as `settings.aiInvite`, with no UI of its own:
+The state lives in `settings.json` (settings blueprint) as `settings.aiInvite`, with no UI of its own (fields `first`, `keyed` and `hadKey` from 1.0 and 1.1 are ignored):
 
 | Field | Meaning |
 | --- | --- |
-| `first` | When the app first ran with this blueprint (ms) |
 | `next` | Earliest time for the next invitation (ms) |
 | `shown` | How many times the card appeared |
 | `later` | How many times the user chose Later (or tapped the backdrop) |
 | `off` | The user chose **Don't remind me again** |
-| `hadKey` | A key existed at some point; skips the first-day wait (1.0.x stored this as `keyed`, read once and renamed) |
 
 ## Step 1: the promise
 
@@ -96,18 +94,15 @@ const INVITE_GAP = 3;          // days between invitations (about twice a week)
 const INVITE_GAP_SLOW = 7;     // days between invitations after the 4th "Later"
 function aiInviteDue(now = Date.now()) {
   const s = settings.aiInvite || (settings.aiInvite = {});
-  if (s.keyed) { s.hadKey = true; delete s.keyed; }   // 1.0.x called it "keyed"
-  if (aiKey()) { if (!s.hadKey) { s.hadKey = true; saveAll(); } return false; }   // a key means AI is on: nothing to invite to
-  if (s.off) return false;   // "Don't remind me again"
-  if (!s.first) { s.first = now; saveAll(); }
-  if (!s.hadKey && now - s.first < INVITE_DAY) return false;   // a new user gets a day with the app first; someone who removed a key doesn't
-  return now >= (s.next || 0);
+  if (aiKey()) return false;   // a key means AI is on: nothing to invite to
+  if (s.off) return false;     // "Don't remind me again"
+  return now >= (s.next || 0); // from the very first launch (right after install), then at most every 3 days
 }
 // Removing the last key turns AI off: invite again from the next launch (call this in the "airm" action).
 function aiInviteKeyRemoved() {
   if (aiKey()) return;
   const s = settings.aiInvite || (settings.aiInvite = {});
-  s.hadKey = true; s.next = 0; saveAll();
+  s.next = 0; saveAll();
 }
 // The page reports what happened: "shown", "open", "later" or "never".
 function aiInviteNote(what, now = Date.now()) {
@@ -267,20 +262,20 @@ Layering: `z-index: 47` puts the card above Settings (13) and the AI sheet (14) 
 
 Run these on a phone, in light and dark mode, with and without Reduce Motion.
 
-- [ ] First launch without a key: no invitation. Set `settings.aiInvite.first` back 2 days and relaunch: the card appears after the launch screen has gone.
+- [ ] First launch without a key (delete `settings.json` to simulate a fresh install): the card appears as soon as the launch screen has gone.
 - [ ] The card springs up, the perks slide in one by one, the ✦ twinkles, **Turn on AI** glows twice; nothing moves with Reduce Motion on.
 - [ ] Title and perks fit without overflow at **Larger** text, on the smallest supported phone.
 - [ ] **Turn on AI**: the card closes, AI settings slides up, **Add key** pulses; with a key saved, no invitation on the next launches.
 - [ ] **Later**, and a tap on the dimmed backdrop: the card closes; it doesn't return on the next launch the same day.
 - [ ] **Don't remind me again**: it never returns, however long you wait.
 - [ ] With an update available (bump `VERSION` down), only the update sheet appears that launch.
-- [ ] With a key saved, no invitation. Remove the last key, close the app and open it again: the invitation appears (no first-day wait), even if it was shown yesterday.
+- [ ] With a key saved, no invitation. Remove the last key, close the app and open it again: the invitation appears, even if it was shown yesterday.
 - [ ] Opening the widget or a Shortcut never shows it.
 - [ ] Every palette: the button text is readable on the accent, and the card's edge is visible on dark pages.
 
 ## Pitfalls
 
-- **Treating a past key as "AI on"** (hit in Stockit, fixed in 1.1.0). 1.0.x stopped for good once a key had existed, so a user who removed their key never saw the invitation. The key alone decides; 1.1.0 renames the old `keyed` flag to `hadKey` and only uses it to skip the first-day wait.
+- **Treating a past key as "AI on"** (hit in Stockit, fixed in 1.1.0). 1.0.x stopped for good once a key had existed, so a user who removed their key never saw the invitation. The key alone decides.
 - **Reading "In use" as "AI on".** The AI sheet marks a provider **In use** even without a key: it is the provider that *would* be called. Never use it, a model list or a switch to decide whether to invite; use `aiKey()`.
 - **Waiting forever for the launch screen** (hit in Stockit, fixed in 1.0.1). The launch-screen blueprint hides `#splash` by adding `.gone` and leaves it in the page, so a check for `#splash` alone stays busy for ever and the invitation silently never appears. Check `#splash:not(.gone)`.
 - **Hard-coded white on the button** (hit while building this). On dark palettes the accent is light and white text disappears. The button's text uses `var(--sheet)`, which is light on light palettes and dark on dark ones.
@@ -313,3 +308,4 @@ Add the AI invitation to [App], following the attached doc "AI invitation for Sc
 | 1.0.0 | 2026-10-30 | First versioned release |
 | 1.0.1 | 2026-10-30 | The page waits for `#splash:not(.gone)` instead of `#splash` (the launch screen stays in the page once hidden); Stockit 1.13.0 is the reference |
 | 1.1.0 | 2026-10-30 | Whether a key exists is the only test: a past key no longer stops the invitation; removing the last key (`aiInviteKeyRemoved` in `airm`) invites from the next launch without the first-day wait; `keyed` renamed `hadKey`. Stockit 1.13.1 is the reference |
+| 1.2.0 | 2026-10-30 | No first-day wait: it can appear on the very first launch, right after installing; the `first` and `hadKey` fields are no longer used. Stockit 1.13.2 is the reference |
