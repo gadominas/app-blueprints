@@ -40,6 +40,7 @@ function readDocs(md) {
   if (!md) return null;
   const rows = {};
   for (const l of md.split('\n')) {
+    if (/^##\s+Recipes/i.test(l)) break;   // recipes have their own table and are not blueprints (AGENTS.md › 1a)
     const m = /^\|\s*\[?([a-z0-9-]+)\]?(?:\([^)]*\))?\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/.exec(l);
     if (m && m[1] !== 'blueprint' && !/^-+$/.test(m[1])) rows[m[1]] = { version: m[2], since: m[3] };
   }
