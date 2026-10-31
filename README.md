@@ -25,9 +25,10 @@ This repository fixes that by keeping one answer per problem:
 | [Launch screen](blueprints/launch-screen.md) | 1.0.0 | A 2.4 s branded launch screen: the app's logo draws itself, then its name and a three-word tagline; tap to skip, Reduce Motion aware, can never get stuck; five colour variables and the logo's parts are all an app changes | [VisionX](https://github.com/gadominas/VisionX) 1.17.1 | 2026-10-29 |
 | [Widgets](blueprints/widgets.md) | 1.0.0 | One widget frame for every app: logo tile and name, one hero, rows, footer, on the logo's ground; small, medium, large and Lock Screen; each app only writes `widgetModel()` from its own data; never presents UI or shows an error | [VisionX](https://github.com/gadominas/VisionX) 1.19.0 | 2026-10-29 |
 | [AI invitation](blueprints/ai-invitation.md) | 1.2.1 | For apps that do more with AI: an animated invitation from the first launch that names three things AI adds, shows the three steps and opens AI settings with **Add key** highlighted; about twice a week at first, weekly after a few “Later”s, only while there's no key, never over anything else, “Don't remind me again” ends it | [Stockit](https://github.com/gadominas/Stockit) 1.13.3 | 2026-10-30 |
+| [Read aloud](blueprints/read-aloud.md) | 1.0.0 | Listen to any text the app shows, with iPhone voices or OpenAI's: Listen buttons named after what they read, a player with a coloured mode label (Full article, TL;DR, Story, Summaries), progress with time left and tap-to-jump, the sentence being read highlighted while read text dims, and a text view that follows the voice; ready-to-paste [snippets](snippets/read-aloud) and a browser demo | [BlogPulse](https://github.com/gadominas/BlogPulse) 1.15.1 | 2026-10-31 |
 | [Anonymous usage analytics](blueprints/usage-analytics.md) | 1.1.0 | Opt-in, anonymous counts to one shared PostHog project for every app (free up to 1M events a month, each event tagged with its app): a one-time question, **Settings › Privacy** with a **Send test** row, a random install ID deleted when switched off, the same core events in every app plus each app's own, sent in batches that never slow the app, every send in the start-up log | [StravaFeed](https://github.com/gadominas/StravaFeed) 1.24.0 | 2026-10-31 |
 
-Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet), then **Launch screen** (self-contained, touches nothing else), then **Widgets** (uses the Settings tunables and the launch screen's name and accent), then **AI invitation** (waits for the launch screen and the update offer, and leads into AI settings; skip it, like AI configuration, in apps without AI), then **Anonymous usage analytics** (counts what the others added and adds a Privacy section to Settings; only when you want numbers; every app sends to the same shared PostHog project). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
+Apply them in this order: **In-app updates** (every later change ships as a version through `releases.json`), then **Settings** (it provides the sheet the other two plug into), then **AI configuration** (its entry is one row in the Settings sheet), then **Launch screen** (self-contained, touches nothing else), then **Widgets** (uses the Settings tunables and the launch screen's name and accent), then **AI invitation** (waits for the launch screen and the update offer, and leads into AI settings; skip it, like AI configuration, in apps without AI), then **Read aloud** (for apps with text worth listening to; adds Settings › Listening, and uses AI configuration only for the AI voice), then **Anonymous usage analytics** (counts what the others added and adds a Privacy section to Settings; only when you want numbers; every app sends to the same shared PostHog project). Where two blueprints overlap, AI configuration governs AI keys, providers and models.
 
 ## Recipes
 
@@ -56,7 +57,10 @@ app-blueprints/
 │   ├── launch-screen.md
 │   ├── widgets.md
 │   ├── ai-invitation.md
+│   ├── read-aloud.md         ← listen with highlighting; code in snippets/read-aloud
 │   └── usage-analytics.md    ← opt-in anonymous counts to PostHog
+├── snippets/
+│   └── read-aloud/           ← ready-to-paste code for a blueprint, tagged with it, plus demo.html
 ├── docs/
 │   └── widgets.png           ← every app's widget in the shared frame
 ├── templates/

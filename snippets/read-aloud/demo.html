@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Read aloud — demo (app-blueprints · read-aloud 1.0.0)</title>
+<!--
+  Runs the read-aloud snippets on their own, in any browser with speech (Safari, Chrome, Edge on a Mac, PC or iPhone).
+  Download this folder and open demo.html. Everything an app would provide (the bridge, settings, toast, the
+  shared tokens and sheet styles from the settings blueprint) is stubbed below, in the smallest form that works.
+-->
+<style>
+/* settings blueprint: the shared tokens (light, then dark) and the bits of shared styling the snippets use */
+:root{--paper:#F7F8FA;--sheet:#FFFFFF;--ink:#14171C;--ink-2:#3B414B;--muted:#6B7280;--rule:#E3E6EB;--signal:#2563EB;--signal-wash:#E6EEFE;--amber:#D97706;--amber-wash:#FEF3E2;--danger:#DC2626;
+  --ts:1;--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;--display:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,system-ui,sans-serif;--serif:"New York",Georgia,serif;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--paper:#0F1115;--sheet:#171A20;--ink:#ECEEF2;--ink-2:#C6CBD3;--muted:#8A919C;--rule:#2A2F38;--signal:#7AB4FF;--signal-wash:#1B2A44;--amber:#F5B042;--amber-wash:#33270F;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:calc(16px * var(--ts))/1.5 var(--sans)}
+body.locked{overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.ico{width:16px;height:16px;fill:currentColor;margin-right:5px;flex:none}
+.sm{display:inline-flex;align-items:center;padding:7px 12px;border-radius:18px;border:1.5px solid var(--rule);background:var(--sheet);font-weight:600;font-size:calc(14px * var(--ts))}
+.note{font-size:calc(13px * var(--ts));color:var(--muted)}
+.muted{color:var(--muted)} .pad{padding:16px}
+.link{color:var(--signal);font-weight:700}
+.sheet{position:fixed;inset:0;z-index:13;background:var(--paper);overflow-y:auto;transform:translateY(102%);transition:transform .3s ease;-webkit-overflow-scrolling:touch}
+.sheet.open{transform:none}
+.sh-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 14px) 20px 12px;background:var(--paper);border-bottom:1px solid var(--rule)}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 14px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;z-index:60;pointer-events:none}
+#toast.on{opacity:1}
+/* the demo's own page */
+#list{max-width:640px;margin:0 auto;padding:24px 20px 40px}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:16px 18px}
+.card h1{font:700 calc(21px * var(--ts))/1.3 var(--display);margin:4px 0 8px}
+.src{font-size:calc(13px * var(--ts));color:var(--muted);font-weight:600}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tli{margin-top:14px;padding:12px 14px;border-left:3px solid var(--signal);background:var(--paper);border-radius:8px}
+.tli p{margin:0 0 8px}.tli ul{margin:0 0 8px;padding-left:20px}
+</style>
+<link rel="stylesheet" href="read-aloud.css">
+</head><body>
+<main id="list">
+  <article class="card" id="c-demo1">
+    <span class="src">Northwind Engineering</span>
+    <h1>Cutting p99 latency in half with virtual threads</h1>
+    <p class="note">Tap <b>Article</b> to hear the whole post, or <b>Listen to TL;DR</b> for the summary. Then open the text from the player.</p>
+    <div class="acts">
+      <button class="lsbtn" data-act="listenarticle" data-id="demo1" aria-label="Listen to the full article"></button>
+      <button class="sm" data-act="listentldr" data-id="demo1"></button>
+    </div>
+    <div class="tli" id="tli-demo1"></div>
+  </article>
+</main>
+<div id="toast" role="status"></div>
+
+<!-- read-aloud.html, pasted -->
+<div id="readsheet" class="sheet" aria-label="Text being read"></div>
+<div id="player" hidden role="region" aria-label="Reading aloud">
+  <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+  <div class="pl-info"><span id="plMode" class="pl-mode" hidden></span><b id="plTitle"></b><small id="plSub"></small></div>
+  <button class="pl-btn" data-act="plread" aria-label="Show the text being read"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 9.5h14M5 14h10M5 18.5h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
+  <button id="plPause" class="pl-btn" data-act="plpause" aria-label="Pause"></button>
+  <button class="pl-btn" data-act="plnext" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M6 5l9 7-9 7zM16 5h3v14h-3z"/></svg></button>
+  <button class="pl-btn" data-act="plstop" aria-label="Stop"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></button>
+  <div class="pl-foot"><div id="plProg" class="pl-prog" data-act="plseek" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="plBar"></i></div><span id="plTime"></span></div>
+</div>
+
+<script>
+// ── What an app provides (stubs) ──
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const S = { settings: { speechEngine: "device", voiceURI: "", voiceRate: 1, voicePitch: 1, voiceGender: "all", hasOpenAI: false } };
+let cfgOpen = false; function renderCfg() {}
+function lockBody() { document.body.classList.toggle("locked", raOpen); }
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2600); }
+const POSTS = { demo1: { id: "demo1", src: "nw", title: "Cutting p99 latency in half with virtual threads" } };
+const byId = id => POSTS[id];
+const srcMap = () => ({ nw: { title: "Northwind Engineering" } });
+const ARTICLE = [
+  "Our checkout services spent more time waiting than working. Every request held a platform thread while it waited on the database, the payment gateway and two internal services.",
+  "During traffic spikes the thread pools ran dry. Requests queued, timeouts cascaded, and the on-call engineer's evening disappeared.",
+  "Virtual threads arrived in JDK 21, and we decided to try them on the busiest service first. The change itself was small: one executor, one flag.",
+  "The hard part was everything around it. Synchronized blocks on hot paths pinned carrier threads, so we replaced them with ReentrantLock before turning anything on.",
+  "Three weeks later, p99 latency was down 48 percent and the peak thread count had fallen from four thousand to three hundred."
+];
+const TLDR = { lead: "Northwind halved p99 latency on its checkout services by moving blocking Java code to virtual threads, without a rewrite.",
+  points: ["Thread-pool exhaustion during traffic spikes caused cascading timeouts.", "Synchronized blocks on hot paths were replaced with ReentrantLock first.", "p99 latency fell 48% and peak threads dropped from 4,000 to 300."],
+  why: "A low-risk runtime change that most Java services on JDK 21 can adopt this quarter." };
+// The bridge: in an app this goes to Scriptable; here it answers locally.
+function send(type, data, cb) {
+  if (type === "articletext") setTimeout(() => window.onArticleText(data.id, { paras: ARTICLE }), 400);
+  else if (type === "ttsaudio") cb && cb(false, "No AI voice in the demo");
+}
+</script>
+<script src="read-aloud.page.js"></script>
+<script src="read-aloud.handlers.page.js"></script>
+<script>
+// ── The demo's own pieces: its TL;DR view (highlighted in place while it's read) and its Listen buttons ──
+function renderTldrBox() {
+  const a = POSTS.demo1, d = TLDR;
+  $("#tli-demo1").innerHTML = `<p><b>${tldrPart(a, "lead", esc(d.lead))}</b></p>
+    <ul>${d.points.map((x, i) => `<li>${tldrPart(a, "pt" + i, esc(x))}</li>`).join("")}</ul>
+    <p>${readingTldr(a) ? tldrPart(a, "why", "") : `<b>Why it matters:</b> ${esc(d.why)}`}</p>`;
+}
+function refreshInPlace() { if (tts.kind === "tldr") renderTldrBox(); }
+document.querySelector('[data-act="listenarticle"]').innerHTML = SPK + "Article";
+document.querySelector('[data-act="listentldr"]').innerHTML = SPK + "Listen to TL;DR";
+renderTldrBox();
+document.addEventListener("click", e => {
+  if (e.target.closest("select, option, input, textarea")) return;
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  if (readAloudAct(t.dataset.act, t, e)) return;
+  const a = byId(t.dataset.id);
+  switch (t.dataset.act) {
+    case "listenarticle":   // speak right away (iOS only lets speech start from a tap), then the article follows
+      speak(srcTitle(a), [{ id: a.id, title: a.title, paras: [{ text: "Loading the article." }] }], undefined, "article"); send("articletext", { id: a.id }); break;
+    case "listentldr": speak(srcTitle(a), tldrItems(a, TLDR), undefined, "tldr"); break;
+  }
+});
+</script>
+</body></html>

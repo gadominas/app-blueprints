@@ -1,5 +1,5 @@
 {
-  "description": "Shared, versioned blueprints for my single-file Scriptable apps (in-app updates, settings, AI configuration, launch screen, widgets, AI invitation, usage analytics), plus the tools that rebuild every app's repository page. Written for people and coding agents.",
+  "description": "Shared, versioned blueprints for my single-file Scriptable apps (in-app updates, settings, AI configuration, launch screen, widgets, AI invitation, read aloud, usage analytics), plus the tools that rebuild every app's repository page. Written for people and coding agents.",
   "homepage": "https://github.com/gadominas/app-blueprints#readme",
   "topics": [
     "scriptable",

@@ -1,0 +1,14 @@
+<!-- ─────────────────────────────────────────────────────────────────────────
+     Read aloud (app-blueprints · read-aloud 1.0.0) — MARKUP
+     At the end of <body>, after the app's other sheets. Taken from BlogPulse 1.15.0.
+     ───────────────────────────────────────────────────────────────────────── -->
+<div id="readsheet" class="sheet" aria-label="Text being read"></div>
+<div id="player" hidden role="region" aria-label="Reading aloud">
+  <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+  <div class="pl-info"><span id="plMode" class="pl-mode" hidden></span><b id="plTitle"></b><small id="plSub"></small></div>
+  <button class="pl-btn" data-act="plread" aria-label="Show the text being read"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 9.5h14M5 14h10M5 18.5h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
+  <button id="plPause" class="pl-btn" data-act="plpause" aria-label="Pause"></button>
+  <button class="pl-btn" data-act="plnext" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M6 5l9 7-9 7zM16 5h3v14h-3z"/></svg></button>
+  <button class="pl-btn" data-act="plstop" aria-label="Stop"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></button>
+  <div class="pl-foot"><div id="plProg" class="pl-prog" data-act="plseek" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="plBar"></i></div><span id="plTime"></span></div>
+</div>
