@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Read aloud (app-blueprints · read-aloud 1.0.0) — SCRIPTABLE SIDE
+// Read aloud (app-blueprints · read-aloud 1.0.1) — SCRIPTABLE SIDE
 // Taken from BlogPulse 1.15.0 with names kept.
 // ─────────────────────────────────────────────────────────────────────────────
 

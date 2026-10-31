@@ -1,7 +1,7 @@
 ---
 id: read-aloud
 title: Read aloud for Scriptable apps
-version: 1.0.0
+version: 1.0.1
 updated: 2026-10-31
 author: Gediminas Siutilas
 reference: BlogPulse 1.15.1 (https://github.com/gadominas/BlogPulse/blob/main/BlogPulse.js)
@@ -255,3 +255,4 @@ Add read aloud to [App], following the blueprint "read-aloud" (github.com/gadomi
 | Version | Date | Changes |
 | --- | --- | --- |
 | 1.0.0 | 2026-10-31 | First versioned release, from BlogPulse 1.15.1: mode labels, progress with time left and jumping, sentence highlighting in place and in a text view, iPhone and AI voices, snippet files and a browser demo |
+| 1.0.1 | 2026-10-31 | `listening-settings.page.js` no longer ends with the settings blueprint's `cardSections()` helper, which had been copied in from BlogPulse; an app pasting the whole file got a second copy. No change to how reading aloud works |

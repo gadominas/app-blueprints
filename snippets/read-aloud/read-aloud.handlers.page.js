@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Read aloud (app-blueprints · read-aloud 1.0.0) — TAP AND CHANGE HANDLERS (page side)
+// Read aloud (app-blueprints · read-aloud 1.0.1) — TAP AND CHANGE HANDLERS (page side)
 // BlogPulse has these cases inline in its one click handler; another app can call readAloudAct() first:
 //   document.addEventListener("click", e => {
 //     if (e.target.closest("select, option, input, textarea")) return;

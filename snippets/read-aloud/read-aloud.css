@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Read aloud (app-blueprints · read-aloud 1.0.0) — STYLES
+   Read aloud (app-blueprints · read-aloud 1.0.1) — STYLES
    Taken from BlogPulse 1.15.0. Every colour is a settings-blueprint token (--paper, --sheet, --ink, --ink-2,
    --muted, --rule, --signal, --signal-wash, --amber) except the four mode labels, which are fixed so a mode
    looks the same in every app and palette. Sizes use calc(<px> * var(--ts)) except inside the player.

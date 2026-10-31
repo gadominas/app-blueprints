@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Read aloud (app-blueprints · read-aloud 1.0.0) — PAGE SIDE
+// Read aloud (app-blueprints · read-aloud 1.0.1) — PAGE SIDE
 // Engine, player, sentence highlighting and the read-along view.
 // Taken from BlogPulse 1.15.0 with names kept. Paste inside the page script (BlogPulse: inside clientApp()).
 //

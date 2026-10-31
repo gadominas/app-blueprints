@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Read aloud (app-blueprints · read-aloud 1.0.0) — SETTINGS › LISTENING (page side)
+// Read aloud (app-blueprints · read-aloud 1.0.1) — SETTINGS › LISTENING (page side)
 // Insert ${listenHTML()} in the Settings sheet as the "Listening" section (after the app's own reading sections).
 // Uses SYN, voices, currentVoice, baseName, quality, genderOf, langName, OAI_VOICES, LEGACY_TTS, SPK from read-aloud.page.js.
 // Without AI configuration, drop aiListenHTML and the engine switch: listenHTML() returns deviceListenHTML().
@@ -43,18 +43,4 @@ function deviceListenHTML() {
     <div class="lk-row"><span class="lk-l">Pitch</span>${seg("voicePitch", [[0.85, "Lower"], [1, "Normal"], [1.15, "Higher"]])}</div>
     <div class="aic-btns"><button class="sm" data-act="voicetest">${SPK}Test the voice</button><span class="note">${voices.length} voices on this ${/iPad/.test(navigator.userAgent) ? "iPad" : "iPhone"}</span></div>
     <p class="note">More natural voices: iOS Settings › Accessibility › Spoken Content › Voices. Download an Enhanced or Premium voice and it appears here.</p>`;
-}
-// Settings blueprint 1.1.0: each section's rows in one card (.grp), built right after every render.
-// A heading's explanation (p.hint right under it) and the changed-count footer (.cfg-foot) stay outside.
-function cardSections(body) {
-  if (!body) return;
-  var inSec = false, grp = null, kids = Array.prototype.slice.call(body.children);
-  kids.forEach(function (n) {
-    var c = n.classList;
-    if (n.tagName === "H3" && c.contains("sec")) { inSec = true; grp = null; return; }
-    if (!inSec || c.contains("grp") || c.contains("cfg-foot")) { grp = null; return; }
-    if (!grp && n.tagName === "P" && c.contains("hint")) return;
-    if (!grp) { grp = document.createElement("div"); grp.className = "grp"; body.insertBefore(grp, n); }
-    grp.appendChild(n);
-  });
 }
